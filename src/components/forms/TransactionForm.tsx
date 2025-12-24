@@ -1,137 +1,151 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Dialog } from '@/components/ui/Dialog'
-import { Input } from '@/components/ui/Input'
-import { CurrencyInput } from '@/components/ui/CurrencyInput'
-import { Select } from '@/components/ui/Select'
-import { useTransactionStore } from '@/stores/useTransactionStore'
-import { useCategoryStore } from '@/stores/useCategoryStore'
-import { useAccountStore } from '@/stores/useAccountStore'
-import { toast } from 'react-toastify'
-import { cn } from '@/lib/utils'
-import { Repeat } from 'lucide-react'
-import type { TransactionType, TransactionStatus, RecurrenceType } from '@/types/finance'
-import { addMonths, addDays, addWeeks, addYears, isBefore } from 'date-fns'
+import { useState, useEffect, useMemo } from "react";
+import { Dialog } from "@/components/ui/Dialog";
+import { Input } from "@/components/ui/Input";
+import { CurrencyInput } from "@/components/ui/CurrencyInput";
+import { Select } from "@/components/ui/Select";
+import { useTransactionStore } from "@/stores/useTransactionStore";
+import { useCategoryStore } from "@/stores/useCategoryStore";
+import { useAccountStore } from "@/stores/useAccountStore";
+import { toast } from "react-toastify";
+import { cn } from "@/lib/utils";
+import { Repeat } from "lucide-react";
+import type {
+  TransactionType,
+  TransactionStatus,
+  RecurrenceType,
+} from "@/types/finance";
+import { addMonths, addDays, addWeeks, addYears, isBefore } from "date-fns";
 
 interface TransactionFormProps {
-  isOpen: boolean
-  onClose: () => void
-  transactionId?: number | null
+  isOpen: boolean;
+  onClose: () => void;
+  transactionId?: number | null;
 }
 
-export function TransactionForm({ isOpen, onClose, transactionId }: TransactionFormProps) {
-  const [type, setType] = useState<TransactionType>('income')
-  const [status, setStatus] = useState<TransactionStatus>('completed')
-  const [amount, setAmount] = useState('')
-  const [description, setDescription] = useState('')
-  const [categoryId, setCategoryId] = useState('')
-  const [accountId, setAccountId] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
-  const [isRecurring, setIsRecurring] = useState(false)
-  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('monthly')
-  const [recurrenceEndDate, setRecurrenceEndDate] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+export function TransactionForm({
+  isOpen,
+  onClose,
+  transactionId,
+}: TransactionFormProps) {
+  const [type, setType] = useState<TransactionType>("income");
+  const [status, setStatus] = useState<TransactionStatus>("completed");
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceType, setRecurrenceType] =
+    useState<RecurrenceType>("monthly");
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const { transactions, addTransaction, updateTransaction, deleteTransaction } = useTransactionStore()
-  const allCategories = useCategoryStore(state => state.categories)
-  const accounts = useAccountStore(state => state.accounts)
+  const { transactions, addTransaction, updateTransaction, deleteTransaction } =
+    useTransactionStore();
+  const allCategories = useCategoryStore((state) => state.categories);
+  const accounts = useAccountStore((state) => state.accounts);
 
-  const isEditing = !!transactionId
-  const transaction = transactions.find(t => t.id === transactionId)
+  const isEditing = !!transactionId;
+  const transaction = transactions.find((t) => t.id === transactionId);
 
   // Filtrar categorias com useMemo para evitar loop
   const categories = useMemo(() => {
-    return allCategories.filter(c => c.type === type)
-  }, [allCategories, type])
+    return allCategories
+      .filter((c) => c.type === type)
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [allCategories, type]);
 
   // Carregar dados da transação ao editar
   useEffect(() => {
     if (transaction) {
-      setType(transaction.type)
-      setStatus(transaction.status)
-      setAmount(String(transaction.amount))
-      setDescription(transaction.description)
-      setCategoryId(String(transaction.categoryId))
-      setAccountId(String(transaction.accountId))
-      setDate(new Date(transaction.date).toISOString().split('T')[0])
-      setIsRecurring(transaction.isRecurring)
-      setRecurrenceType(transaction.recurrenceType)
+      setType(transaction.type);
+      setStatus(transaction.status);
+      setAmount(String(transaction.amount));
+      setDescription(transaction.description);
+      setCategoryId(String(transaction.categoryId));
+      setAccountId(String(transaction.accountId));
+      setDate(new Date(transaction.date).toISOString().split("T")[0]);
+      setIsRecurring(transaction.isRecurring);
+      setRecurrenceType(transaction.recurrenceType);
       setRecurrenceEndDate(
-        transaction.recurrenceEndDate 
-          ? new Date(transaction.recurrenceEndDate).toISOString().split('T')[0]
-          : ''
-      )
+        transaction.recurrenceEndDate
+          ? new Date(transaction.recurrenceEndDate).toISOString().split("T")[0]
+          : ""
+      );
     }
-  }, [transaction])
+  }, [transaction]);
 
   // Reset categoryId quando mudar o tipo
   useEffect(() => {
     if (!isEditing) {
-      setCategoryId('')
+      setCategoryId("");
     }
-  }, [type, isEditing])
+  }, [type, isEditing]);
 
   // Setar primeira conta como padrão
   useEffect(() => {
     if (accounts.length > 0 && !accountId) {
-      setAccountId(String(accounts[0].id))
+      setAccountId(String(accounts[0].id));
     }
-  }, [accounts, accountId])
+  }, [accounts, accountId]);
 
   // Sugerir data final (12 meses no futuro) quando ativar recorrência
   useEffect(() => {
     if (isRecurring && !recurrenceEndDate && !isEditing) {
-      const suggestedDate = addMonths(new Date(date), 12)
-      setRecurrenceEndDate(suggestedDate.toISOString().split('T')[0])
+      const suggestedDate = addMonths(new Date(date), 12);
+      setRecurrenceEndDate(suggestedDate.toISOString().split("T")[0]);
     }
-  }, [isRecurring, date, recurrenceEndDate, isEditing])
+  }, [isRecurring, date, recurrenceEndDate, isEditing]);
 
   // Validar data de recorrência
   const getMinEndDate = () => {
-    const baseDate = new Date(date)
+    const baseDate = new Date(date);
     switch (recurrenceType) {
-      case 'daily':
-        return addDays(baseDate, 1)
-      case 'weekly':
-        return addWeeks(baseDate, 1)
-      case 'monthly':
-        return addMonths(baseDate, 1)
-      case 'yearly':
-        return addYears(baseDate, 1)
+      case "daily":
+        return addDays(baseDate, 1);
+      case "weekly":
+        return addWeeks(baseDate, 1);
+      case "monthly":
+        return addMonths(baseDate, 1);
+      case "yearly":
+        return addYears(baseDate, 1);
       default:
-        return addDays(baseDate, 1)
+        return addDays(baseDate, 1);
     }
-  }
+  };
 
   const handleSubmit = async () => {
     if (!amount || !description || !categoryId || !accountId) {
-      toast.error('Preencha todos os campos')
-      return
+      toast.error("Preencha todos os campos");
+      return;
     }
 
-    const numAmount = parseFloat(amount)
+    const numAmount = parseFloat(amount);
     if (numAmount <= 0) {
-      toast.error('O valor deve ser maior que zero')
-      return
+      toast.error("O valor deve ser maior que zero");
+      return;
     }
 
     if (isRecurring) {
-      if (recurrenceType === 'none') {
-        toast.error('Selecione a frequência da recorrência')
-        return
+      if (recurrenceType === "none") {
+        toast.error("Selecione a frequência da recorrência");
+        return;
       }
 
       if (recurrenceEndDate) {
-        const minDate = getMinEndDate()
-        const endDate = new Date(recurrenceEndDate)
-        
+        const minDate = getMinEndDate();
+        const endDate = new Date(recurrenceEndDate);
+
         if (isBefore(endDate, minDate)) {
-          toast.error(`A data final deve ser pelo menos uma ocorrência após a data inicial`)
-          return
+          toast.error(
+            `A data final deve ser pelo menos uma ocorrência após a data inicial`
+          );
+          return;
         }
       }
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       const transactionData = {
         type,
@@ -142,51 +156,56 @@ export function TransactionForm({ isOpen, onClose, transactionId }: TransactionF
         accountId: parseInt(accountId),
         date: new Date(date),
         isRecurring,
-        recurrenceType: isRecurring ? recurrenceType : 'none' as RecurrenceType,
-        recurrenceEndDate: isRecurring && recurrenceEndDate ? new Date(recurrenceEndDate) : undefined
-      }
+        recurrenceType: isRecurring
+          ? recurrenceType
+          : ("none" as RecurrenceType),
+        recurrenceEndDate:
+          isRecurring && recurrenceEndDate
+            ? new Date(recurrenceEndDate)
+            : undefined,
+      };
 
       if (isEditing && transactionId) {
-        await updateTransaction(transactionId, transactionData)
-        toast.success('Transação atualizada com sucesso!')
+        await updateTransaction(transactionId, transactionData);
+        toast.success("Transação atualizada com sucesso!");
       } else {
-        await addTransaction(transactionData)
+        await addTransaction(transactionData);
         toast.success(
-          isRecurring 
-            ? 'Transação recorrente criada!'
-            : 'Transação adicionada com sucesso!'
-        )
+          isRecurring
+            ? "Transação recorrente criada!"
+            : "Transação adicionada com sucesso!"
+        );
       }
-      onClose()
+      onClose();
     } catch {
-      toast.error('Erro ao salvar transação')
+      toast.error("Erro ao salvar transação");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleDelete = async () => {
-    if (!transactionId) return
+    if (!transactionId) return;
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      await deleteTransaction(transactionId)
-      toast.success('Transação excluída com sucesso!')
-      onClose()
+      await deleteTransaction(transactionId);
+      toast.success("Transação excluída com sucesso!");
+      onClose();
     } catch {
-      toast.error('Erro ao excluir transação')
+      toast.error("Erro ao excluir transação");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <Dialog
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={handleSubmit}
-      title={isEditing ? 'Editar Transação' : 'Nova Transação'}
-      confirmText={isEditing ? 'Salvar' : 'Adicionar'}
+      title={isEditing ? "Editar Transação" : "Nova Transação"}
+      confirmText={isEditing ? "Salvar" : "Adicionar"}
       isLoading={isLoading}
     >
       <div className="space-y-4">
@@ -198,28 +217,28 @@ export function TransactionForm({ isOpen, onClose, transactionId }: TransactionF
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setType('income')}
+              onClick={() => setType("income")}
               disabled={isEditing}
               className={cn(
-                'flex-1 py-3 rounded-xl font-medium transition-all',
-                type === 'income'
-                  ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
-                  : 'bg-stone-200 text-stone-600 dark:bg-stone-800 dark:text-stone-400',
-                isEditing && 'opacity-50 cursor-not-allowed'
+                "flex-1 py-3 rounded-xl font-medium transition-all",
+                type === "income"
+                  ? "bg-green-600 text-white shadow-lg shadow-green-600/30"
+                  : "bg-stone-200 text-stone-600 dark:bg-stone-800 dark:text-stone-400",
+                isEditing && "opacity-50 cursor-not-allowed"
               )}
             >
               Receita
             </button>
             <button
               type="button"
-              onClick={() => setType('expense')}
+              onClick={() => setType("expense")}
               disabled={isEditing}
               className={cn(
-                'flex-1 py-3 rounded-xl font-medium transition-all',
-                type === 'expense'
-                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/30'
-                  : 'bg-stone-200 text-stone-600 dark:bg-stone-800 dark:text-stone-400',
-                isEditing && 'opacity-50 cursor-not-allowed'
+                "flex-1 py-3 rounded-xl font-medium transition-all",
+                type === "expense"
+                  ? "bg-red-600 text-white shadow-lg shadow-red-600/30"
+                  : "bg-stone-200 text-stone-600 dark:bg-stone-800 dark:text-stone-400",
+                isEditing && "opacity-50 cursor-not-allowed"
               )}
             >
               Despesa
@@ -234,33 +253,33 @@ export function TransactionForm({ isOpen, onClose, transactionId }: TransactionF
               Marcar como paga
             </p>
             <p className="text-sm text-stone-500">
-              {status === 'completed' ? 'Afeta o saldo da conta' : 'Não afeta o saldo'}
+              {status === "completed"
+                ? "Afeta o saldo da conta"
+                : "Não afeta o saldo"}
             </p>
           </div>
           <button
             type="button"
-            onClick={() => setStatus(status === 'completed' ? 'pending' : 'completed')}
+            onClick={() =>
+              setStatus(status === "completed" ? "pending" : "completed")
+            }
             className={cn(
-              'relative w-14 h-8 rounded-full transition-colors',
-              status === 'completed' 
-                ? 'bg-green-600' 
-                : 'bg-stone-300 dark:bg-stone-700'
+              "relative w-14 h-8 rounded-full transition-colors",
+              status === "completed"
+                ? "bg-green-600"
+                : "bg-stone-300 dark:bg-stone-700"
             )}
           >
             <div
               className={cn(
-                'absolute top-1 w-6 h-6 rounded-full bg-white transition-transform shadow-md',
-                status === 'completed' ? 'translate-x-7' : 'translate-x-1'
+                "absolute top-1 w-6 h-6 rounded-full bg-white transition-transform shadow-md",
+                status === "completed" ? "translate-x-7" : "translate-x-1"
               )}
             />
           </button>
         </div>
 
-        <CurrencyInput
-          label="Valor"
-          value={amount}
-          onChange={setAmount}
-        />
+        <CurrencyInput label="Valor" value={amount} onChange={setAmount} />
 
         <Input
           label="Descrição"
@@ -311,25 +330,21 @@ export function TransactionForm({ isOpen, onClose, transactionId }: TransactionF
               <p className="font-medium text-stone-900 dark:text-stone-50">
                 Repetir automaticamente
               </p>
-              <p className="text-sm text-stone-500">
-                Transação recorrente
-              </p>
+              <p className="text-sm text-stone-500">Transação recorrente</p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => setIsRecurring(!isRecurring)}
             className={cn(
-              'relative w-14 h-8 rounded-full transition-colors',
-              isRecurring 
-                ? 'bg-blue-600' 
-                : 'bg-stone-300 dark:bg-stone-700'
+              "relative w-14 h-8 rounded-full transition-colors",
+              isRecurring ? "bg-blue-600" : "bg-stone-300 dark:bg-stone-700"
             )}
           >
             <div
               className={cn(
-                'absolute top-1 w-6 h-6 rounded-full bg-white transition-transform shadow-md',
-                isRecurring ? 'translate-x-7' : 'translate-x-1'
+                "absolute top-1 w-6 h-6 rounded-full bg-white transition-transform shadow-md",
+                isRecurring ? "translate-x-7" : "translate-x-1"
               )}
             />
           </button>
@@ -341,7 +356,9 @@ export function TransactionForm({ isOpen, onClose, transactionId }: TransactionF
             <Select
               label="Frequência"
               value={recurrenceType}
-              onChange={(e) => setRecurrenceType(e.target.value as RecurrenceType)}
+              onChange={(e) =>
+                setRecurrenceType(e.target.value as RecurrenceType)
+              }
             >
               <option value="none">Selecione...</option>
               <option value="daily">Diária</option>
@@ -355,7 +372,7 @@ export function TransactionForm({ isOpen, onClose, transactionId }: TransactionF
               type="date"
               value={recurrenceEndDate}
               onChange={(e) => setRecurrenceEndDate(e.target.value)}
-              min={getMinEndDate().toISOString().split('T')[0]}
+              min={getMinEndDate().toISOString().split("T")[0]}
             />
           </div>
         )}
@@ -371,5 +388,5 @@ export function TransactionForm({ isOpen, onClose, transactionId }: TransactionF
         )}
       </div>
     </Dialog>
-  )
+  );
 }
