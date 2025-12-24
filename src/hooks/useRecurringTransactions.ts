@@ -62,9 +62,5 @@ export function useRecurringTransactions() {
     };
 
     checkAndGenerateRecurring();
-
-    const interval = setInterval(checkAndGenerateRecurring, 60 * 60 * 1000);
-
-    return () => clearInterval(interval);
   }, [transactions, addTransaction]);
 }
