@@ -8,32 +8,54 @@ import { useCategoryStore } from "@/stores/useCategoryStore";
 import { useAccountStore } from "@/stores/useAccountStore";
 import { toast } from "react-toastify";
 import { cn } from "@/lib/utils";
+import { formatDateForInput, createDateInMonth, parseInputDate } from '@/lib/dateUtils';
 import { Repeat } from "lucide-react";
 import type {
   TransactionType,
   TransactionStatus,
   RecurrenceType,
 } from "@/types/finance";
-import { addMonths, addDays, addWeeks, addYears, isBefore } from "date-fns";
+import {
+  addMonths,
+  addDays,
+  addWeeks,
+  addYears,
+  isBefore,
+} from "date-fns";
 
 interface TransactionFormProps {
   isOpen: boolean;
   onClose: () => void;
   transactionId?: number | null;
+  initialType?: "income" | "expense";
+  suggestedMonth?: Date;
 }
 
 export function TransactionForm({
   isOpen,
   onClose,
   transactionId,
+  initialType,
+  suggestedMonth,
 }: TransactionFormProps) {
-  const [type, setType] = useState<TransactionType>("income");
+  const [type, setType] = useState<TransactionType>(initialType || "income");
   const [status, setStatus] = useState<TransactionStatus>("completed");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(() => {
+    if (transactionId) {
+      return formatDateForInput(new Date());
+    }
+
+    if (suggestedMonth) {
+      return createDateInMonth(suggestedMonth);
+    }
+
+    return formatDateForInput(new Date());
+  });
+
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceType, setRecurrenceType] =
     useState<RecurrenceType>("monthly");
@@ -64,12 +86,12 @@ export function TransactionForm({
       setDescription(transaction.description);
       setCategoryId(String(transaction.categoryId));
       setAccountId(String(transaction.accountId));
-      setDate(new Date(transaction.date).toISOString().split("T")[0]);
+      setDate(formatDateForInput(new Date(transaction.date)));
       setIsRecurring(transaction.isRecurring);
       setRecurrenceType(transaction.recurrenceType);
       setRecurrenceEndDate(
         transaction.recurrenceEndDate
-          ? new Date(transaction.recurrenceEndDate).toISOString().split("T")[0]
+          ? formatDateForInput(new Date(transaction.recurrenceEndDate))
           : ""
       );
     }
@@ -154,15 +176,12 @@ export function TransactionForm({
         description,
         categoryId: parseInt(categoryId),
         accountId: parseInt(accountId),
-        date: new Date(date),
+        date: parseInputDate(date),
         isRecurring,
         recurrenceType: isRecurring
           ? recurrenceType
           : ("none" as RecurrenceType),
-        recurrenceEndDate:
-          isRecurring && recurrenceEndDate
-            ? new Date(recurrenceEndDate)
-            : undefined,
+        recurrenceEndDate: isRecurring && recurrenceEndDate ? parseInputDate(recurrenceEndDate) : undefined,
       };
 
       if (isEditing && transactionId) {
