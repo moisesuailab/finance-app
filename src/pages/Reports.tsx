@@ -1,119 +1,124 @@
-import { useMemo, useState } from 'react'
-import { TrendingUp, PieChart, Calendar } from 'lucide-react'
-import { MobileLayout } from '@/components/layout/MobileLayout'
-import { Header } from '@/components/layout/Header'
-import { Card, CardContent, CardHeader } from '@/components/ui/Card'
-import { MonthSelector } from '@/components/ui/MonthSelector'
-import { useTransactionStore } from '@/stores/useTransactionStore'
-import { useCategoryStore } from '@/stores/useCategoryStore'
-import { formatCurrency } from '@/lib/formatters'
-import { isInMonthRange } from '@/lib/dateUtils'
-import { 
-  PieChart as RechartsPie, 
-  Pie, 
-  Cell, 
-  ResponsiveContainer, 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
+import { useMemo, useState } from "react";
+import { TrendingUp, PieChart, Calendar } from "lucide-react";
+import { MobileLayout } from "@/components/layout/MobileLayout";
+import { Header } from "@/components/layout/Header";
+import { Card, CardContent, CardHeader } from "@/components/ui/Card";
+import { MonthSelector } from "@/components/ui/MonthSelector";
+import { useTransactionStore } from "@/stores/useTransactionStore";
+import { useCategoryStore } from "@/stores/useCategoryStore";
+import { formatCurrency } from "@/lib/formatters";
+import { isInMonthRange } from "@/lib/dateUtils";
+import {
+  PieChart as RechartsPie,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
-  Legend
-} from 'recharts'
-import { format, subMonths, startOfMonth } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+  Legend,
+} from "recharts";
+import { format, subMonths, startOfMonth } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export function Reports() {
-  const [selectedMonth, setSelectedMonth] = useState(new Date())
-  
-  const transactions = useTransactionStore(state => state.transactions)
-  const categories = useCategoryStore(state => state.categories)
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+
+  const transactions = useTransactionStore((state) => state.transactions);
+  const categories = useCategoryStore((state) => state.categories);
 
   // Despesas por categoria no mês
   const expensesByCategory = useMemo(() => {
-    const monthTransactions = transactions.filter(t => 
-      isInMonthRange(new Date(t.date), selectedMonth) &&
-      t.status === 'completed' &&
-      t.type === 'expense'
-    )
+    const monthTransactions = transactions.filter(
+      (t) =>
+        isInMonthRange(new Date(t.date), selectedMonth) &&
+        t.status === "completed" &&
+        t.type === "expense"
+    );
 
     const grouped = monthTransactions.reduce((acc, t) => {
-      const categoryId = t.categoryId
+      const categoryId = t.categoryId;
       if (!acc[categoryId]) {
-        acc[categoryId] = 0
+        acc[categoryId] = 0;
       }
-      acc[categoryId] += t.amount
-      return acc
-    }, {} as Record<number, number>)
+      acc[categoryId] += t.amount;
+      return acc;
+    }, {} as Record<number, number>);
 
     return Object.entries(grouped)
       .map(([categoryId, amount]) => {
-        const category = categories.find(c => c.id === parseInt(categoryId))
+        const category = categories.find((c) => c.id === parseInt(categoryId));
         return {
-          name: category?.name || 'Outros',
+          name: category?.name || "Outros",
           value: amount,
-          color: category?.color || '#6b7280'
-        }
+          color: category?.color || "#6b7280",
+        };
       })
       .sort((a, b) => b.value - a.value)
-      .slice(0, 8) // Top 8 categorias
-  }, [transactions, categories, selectedMonth])
+      .slice(0, 8); // Top 8 categorias
+  }, [transactions, categories, selectedMonth]);
 
   // Evolução dos últimos 6 meses
   const monthlyEvolution = useMemo(() => {
-    const data = []
-    
+    const data = [];
+
     for (let i = 5; i >= 0; i--) {
-      const month = subMonths(selectedMonth, i)
-      const monthStart = startOfMonth(month)
-      
-      const monthTransactions = transactions.filter(t => {
-        const date = new Date(t.date)
-        return isInMonthRange(date, month) && t.status === 'completed'
-      })
+      const month = subMonths(selectedMonth, i);
+      const monthStart = startOfMonth(month);
+
+      const monthTransactions = transactions.filter((t) => {
+        const date = new Date(t.date);
+        return isInMonthRange(date, month) && t.status === "completed";
+      });
 
       const income = monthTransactions
-        .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + t.amount, 0)
+        .filter((t) => t.type === "income")
+        .reduce((sum, t) => sum + t.amount, 0);
 
       const expenses = monthTransactions
-        .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + t.amount, 0)
+        .filter((t) => t.type === "expense")
+        .reduce((sum, t) => sum + t.amount, 0);
 
       data.push({
-        month: format(monthStart, 'MMM', { locale: ptBR }),
+        month: format(monthStart, "MMM", { locale: ptBR }),
         receitas: income,
         despesas: expenses,
-        saldo: income - expenses
-      })
+        saldo: income - expenses,
+      });
     }
 
-    return data
-  }, [transactions, selectedMonth])
+    return data;
+  }, [transactions, selectedMonth]);
 
   // Estatísticas do mês
   const monthStats = useMemo(() => {
-    const monthTransactions = transactions.filter(t => 
-      isInMonthRange(new Date(t.date), selectedMonth) &&
-      t.status === 'completed'
-    )
+    const monthTransactions = transactions.filter(
+      (t) =>
+        isInMonthRange(new Date(t.date), selectedMonth) &&
+        t.status === "completed"
+    );
 
     const income = monthTransactions
-      .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0)
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => sum + t.amount, 0);
 
     const expenses = monthTransactions
-      .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0)
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => sum + t.amount, 0);
 
-    const balance = income - expenses
-    const transactionCount = monthTransactions.length
+    const balance = income - expenses;
+    const transactionCount = monthTransactions.length;
 
-    return { income, expenses, balance, transactionCount }
-  }, [transactions, selectedMonth])
+    return { income, expenses, balance, transactionCount };
+  }, [transactions, selectedMonth]);
 
-  const totalExpenses = expensesByCategory.reduce((sum, item) => sum + item.value, 0)
+  const totalExpenses = expensesByCategory.reduce(
+    (sum, item) => sum + item.value,
+    0
+  );
 
   return (
     <MobileLayout>
@@ -121,7 +126,7 @@ export function Reports() {
 
       <div className="p-4 sm:p-6 space-y-4">
         {/* Seletor de Mês */}
-        <MonthSelector 
+        <MonthSelector
           currentMonth={selectedMonth}
           onChange={setSelectedMonth}
         />
@@ -146,12 +151,14 @@ export function Reports() {
                 <TrendingUp className="w-4 h-4" />
                 <span className="text-xs">Balanço</span>
               </div>
-              <p className={`text-xl font-bold ${
-                monthStats.balance >= 0 
-                  ? 'text-green-600 dark:text-green-500' 
-                  : 'text-red-600 dark:text-red-500'
-              }`}>
-                {monthStats.balance >= 0 ? '+' : ''}
+              <p
+                className={`text-xl font-bold ${
+                  monthStats.balance >= 0
+                    ? "text-green-600 dark:text-green-500"
+                    : "text-red-600 dark:text-red-500"
+                }`}
+              >
+                {monthStats.balance >= 0 ? "+" : ""}
                 {formatCurrency(monthStats.balance)}
               </p>
             </CardContent>
@@ -169,49 +176,58 @@ export function Reports() {
           <CardContent className="p-4 pt-2">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={monthlyEvolution} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" />
-                  <XAxis 
-                    dataKey="month" 
+                <LineChart
+                  data={monthlyEvolution}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
                     stroke="currentColor"
-                    className="text-xs text-stone-500"
-                    tick={{ fill: 'currentColor' }}
+                    className="opacity-10"
                   />
-                  <YAxis 
+                  <XAxis
+                    dataKey="month"
                     stroke="currentColor"
                     className="text-xs text-stone-500"
-                    tick={{ fill: 'currentColor' }}
+                    tick={{ fill: "currentColor" }}
+                  />
+                  <YAxis
+                    stroke="currentColor"
+                    className="text-xs text-stone-500"
+                    tick={{ fill: "currentColor" }}
                     tickFormatter={(value) => {
                       if (value >= 1000) {
-                        return `${(value / 1000).toFixed(1)}k`
+                        return `${(value / 1000).toFixed(1)}k`;
                       }
-                      return `${value}`
+                      return `${value}`;
                     }}
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      color: 'white'
+                      backgroundColor: "rgba(0, 0, 0, 0.8)",
+                      border: "none",
+                      borderRadius: "8px",
+                      color: "white",
                     }}
-                    formatter={(value) => typeof value === 'number' ? formatCurrency(value) : ''}
+                    formatter={(value) =>
+                      typeof value === "number" ? formatCurrency(value) : ""
+                    }
                   />
                   <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="receitas" 
-                    stroke="#10b981" 
+                  <Line
+                    type="monotone"
+                    dataKey="receitas"
+                    stroke="#10b981"
                     strokeWidth={2}
-                    dot={{ fill: '#10b981', r: 4 }}
+                    dot={{ fill: "#10b981", r: 4 }}
                     name="Receitas"
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="despesas" 
-                    stroke="#ef4444" 
+                  <Line
+                    type="monotone"
+                    dataKey="despesas"
+                    stroke="#ef4444"
                     strokeWidth={2}
-                    dot={{ fill: '#ef4444', r: 4 }}
+                    dot={{ fill: "#ef4444", r: 4 }}
                     name="Despesas"
                   />
                 </LineChart>
@@ -242,10 +258,19 @@ export function Reports() {
                       paddingAngle={2}
                       dataKey="value"
                       label={({ name, percent }) => {
-                        const percentValue = percent ?? 0
-                        return `${name} ${(percentValue * 100).toFixed(0)}%`
+                        const percentValue = percent ?? 0;
+                        return `${name} ${(percentValue * 100).toFixed(0)}%`;
                       }}
-                      labelLine={{ stroke: 'currentColor', strokeWidth: 1 }}
+                      labelLine={{
+                        stroke: "#ffffff",
+                        strokeWidth: 1,
+                        strokeOpacity: 0.8,
+                      }}
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: "600",
+                        fill: "#ffffff",
+                      }}
                     >
                       {expensesByCategory.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -253,12 +278,14 @@ export function Reports() {
                     </Pie>
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        border: 'none',
-                        borderRadius: '8px',
-                        color: 'white'
+                        backgroundColor: "rgba(0, 0, 0, 0.8)",
+                        border: "none",
+                        borderRadius: "8px",
+                        color: "white",
                       }}
-                      formatter={(value) => typeof value === 'number' ? formatCurrency(value) : ''}
+                      formatter={(value) =>
+                        typeof value === "number" ? formatCurrency(value) : ""
+                      }
                     />
                   </RechartsPie>
                 </ResponsiveContainer>
@@ -267,9 +294,12 @@ export function Reports() {
               {/* Lista de Categorias */}
               <div className="mt-4 space-y-2">
                 {expensesByCategory.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between">
+                  <div
+                    key={item.name}
+                    className="flex items-center justify-between"
+                  >
                     <div className="flex items-center gap-2">
-                      <div 
+                      <div
                         className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: item.color }}
                       />
@@ -325,8 +355,10 @@ export function Reports() {
                       <div
                         className="h-2 rounded-full transition-all"
                         style={{
-                          width: `${(item.value / expensesByCategory[0].value) * 100}%`,
-                          backgroundColor: item.color
+                          width: `${
+                            (item.value / expensesByCategory[0].value) * 100
+                          }%`,
+                          backgroundColor: item.color,
                         }}
                       />
                     </div>
@@ -343,5 +375,5 @@ export function Reports() {
         )}
       </div>
     </MobileLayout>
-  )
+  );
 }
