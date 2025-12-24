@@ -1,39 +1,39 @@
-import { useState } from 'react'
-import { Wallet, ArrowRight, Check } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { useState } from "react";
+import { Wallet, ArrowRight, Check } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface WelcomeProps {
-  onComplete: () => void
+  onComplete: () => void;
 }
 
 export function Welcome({ onComplete }: WelcomeProps) {
-  const [step, setStep] = useState(0)
+  const [step, setStep] = useState(0);
 
   const features = [
     {
-      icon: '💰',
-      title: 'Controle Total',
-      description: 'Gerencie suas finanças de forma simples e eficiente'
+      icon: "💰",
+      title: "Controle Total",
+      description: "Organize suas finanças de forma simples e visual",
     },
     {
-      icon: '🔒',
-      title: 'Privacidade Garantida',
-      description: 'Seus dados ficam apenas no seu dispositivo'
+      icon: "🔒",
+      title: "Privacidade Garantida",
+      description: "Seus dados ficam apenas no seu dispositivo, sem cadastros",
     },
     {
-      icon: '📱',
-      title: 'Offline First',
-      description: 'Funciona perfeitamente sem conexão com a internet'
+      icon: "📱",
+      title: "Funciona Offline",
+      description: "Use a qualquer momento, sem precisar de internet",
     },
     {
-      icon: '🔄',
-      title: 'Transações Recorrentes',
-      description: 'Automatize lançamentos mensais como salário e contas fixas'
-    }
-  ]
+      icon: "🔄",
+      title: "Lançamentos Automáticos",
+      description: "Configure gastos e receitas que se repetem todo mês",
+    },
+  ];
 
   if (step > 0 && step <= features.length) {
-    const feature = features[step - 1]
+    const feature = features[step - 1];
     return (
       <div className="min-h-screen flex flex-col items-center justify-between p-6 bg-gradient-to-b from-stone-50 to-stone-100 dark:from-stone-950 dark:to-stone-900">
         <div className="w-full max-w-md pt-12">
@@ -44,8 +44,8 @@ export function Welcome({ onComplete }: WelcomeProps) {
                 key={index}
                 className={`flex-1 h-1 rounded-full transition-all ${
                   index < step
-                    ? 'bg-stone-900 dark:bg-stone-50'
-                    : 'bg-stone-300 dark:bg-stone-700'
+                    ? "bg-stone-900 dark:bg-stone-50"
+                    : "bg-stone-300 dark:bg-stone-700"
                 }`}
               />
             ))}
@@ -66,7 +66,9 @@ export function Welcome({ onComplete }: WelcomeProps) {
         {/* Actions */}
         <div className="w-full max-w-md space-y-3 pb-8">
           <Button
-            onClick={() => step === features.length ? onComplete() : setStep(step + 1)}
+            onClick={() =>
+              step === features.length ? onComplete() : setStep(step + 1)
+            }
             className="w-full gap-2"
           >
             {step === features.length ? (
@@ -89,7 +91,7 @@ export function Welcome({ onComplete }: WelcomeProps) {
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -97,7 +99,10 @@ export function Welcome({ onComplete }: WelcomeProps) {
       <div className="text-center space-y-6 max-w-md">
         <div className="flex justify-center">
           <div className="p-6 bg-stone-200 dark:bg-stone-800 rounded-3xl">
-            <Wallet className="w-16 h-16 text-stone-700 dark:text-stone-300" strokeWidth={1.5} />
+            <Wallet
+              className="w-16 h-16 text-stone-700 dark:text-stone-300"
+              strokeWidth={1.5}
+            />
           </div>
         </div>
 
@@ -111,19 +116,16 @@ export function Welcome({ onComplete }: WelcomeProps) {
         </div>
 
         <div className="pt-4 space-y-4">
-          <Button 
-            onClick={() => setStep(1)}
-            className="w-full gap-2"
-          >
+          <Button onClick={() => setStep(1)} className="w-full gap-2">
             Começar
             <ArrowRight className="w-5 h-5" />
           </Button>
-          
+
           <p className="text-sm text-stone-500">
             Seus dados permanecem no seu dispositivo
           </p>
         </div>
       </div>
     </div>
-  )
+  );
 }
