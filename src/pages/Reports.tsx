@@ -256,7 +256,7 @@ export function Reports() {
                         backgroundColor: 'rgba(0, 0, 0, 0.8)',
                         border: 'none',
                         borderRadius: '8px',
-                        color: 'white'
+                        color: '#ffffff'
                       }}
                       formatter={(value) => typeof value === 'number' ? formatCurrency(value) : ''}
                     />
@@ -345,3 +345,4 @@ export function Reports() {
     </MobileLayout>
   )
 }
+
