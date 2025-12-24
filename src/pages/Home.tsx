@@ -5,7 +5,7 @@ import {
   Wallet,
   TrendingUp,
   Clock,
-  Settings
+  Settings,
 } from "lucide-react";
 import { MobileLayout } from "@/components/layout/MobileLayout";
 import { Header } from "@/components/layout/Header";
@@ -17,17 +17,24 @@ import { useCategoryStore } from "@/stores/useCategoryStore";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { isInMonthRange } from "@/lib/dateUtils";
 import { TransactionForm } from "@/components/forms/TransactionForm";
-import { SettingsDrawer } from '@/components/modals/SettingsDrawer'
+import { SettingsDrawer } from "@/components/modals/SettingsDrawer";
 
+interface HomeProps {
+  onNavigate: (
+    tab: "home" | "transactions" | "accounts" | "categories" | "reports"
+  ) => void;
+}
 
-export function Home() {
+export function Home({ onNavigate }: HomeProps) {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<number | null>(
     null
   );
-  const [showSettings, setShowSettings] = useState(false)
-
+  const [initialTransactionType, setInitialTransactionType] = useState<
+    "income" | "expense"
+  >("income");
+  const [showSettings, setShowSettings] = useState(false);
 
   const accounts = useAccountStore((state) => state.accounts);
   const transactions = useTransactionStore((state) => state.transactions);
@@ -83,9 +90,15 @@ export function Home() {
     setEditingTransaction(null);
   };
 
+  const handleOpenFormWithType = (type: "income" | "expense") => {
+    setInitialTransactionType(type);
+    setEditingTransaction(null);
+    setShowForm(true);
+  };
+
   return (
     <MobileLayout>
-      <Header 
+      <Header
         title="Início"
         action={
           <button
@@ -105,7 +118,10 @@ export function Home() {
         />
 
         {/* Saldo Total */}
-        <Card className="bg-gradient-to-br from-stone-900 to-stone-800 dark:from-stone-800 dark:to-stone-900 border-0">
+        <Card
+          className="bg-gradient-to-br from-stone-900 to-stone-800 dark:from-stone-800 dark:to-stone-900 border-0 cursor-pointer active:scale-[0.98] transition-transform"
+          onClick={() => onNavigate("accounts")}
+        >
           <CardContent className="p-6">
             <div className="flex items-center gap-2 text-stone-400 mb-2">
               <Wallet className="w-4 h-4" />
@@ -130,7 +146,10 @@ export function Home() {
 
         {/* Cards Resumo */}
         <div className="grid grid-cols-2 gap-4">
-          <Card>
+          <Card
+            className="cursor-pointer active:scale-[0.98] transition-transform hover:shadow-md"
+            onClick={() => handleOpenFormWithType("income")}
+          >
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-green-600 dark:text-green-500 mb-2">
                 <div className="p-1.5 bg-green-100 dark:bg-green-950 rounded-lg">
@@ -144,7 +163,10 @@ export function Home() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card
+            className="cursor-pointer active:scale-[0.98] transition-transform hover:shadow-md"
+            onClick={() => handleOpenFormWithType("expense")}
+          >
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-red-600 dark:text-red-500 mb-2">
                 <div className="p-1.5 bg-red-100 dark:bg-red-950 rounded-lg">
@@ -239,7 +261,10 @@ export function Home() {
       </div>
 
       {/* Settings Drawer */}
-      <SettingsDrawer isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <SettingsDrawer
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
 
       {/* Formulário de Transação */}
       {showForm && (
@@ -247,6 +272,8 @@ export function Home() {
           isOpen={showForm}
           onClose={handleCloseForm}
           transactionId={editingTransaction}
+          initialType={editingTransaction ? undefined : initialTransactionType}
+          suggestedMonth={selectedMonth}
         />
       )}
     </MobileLayout>
