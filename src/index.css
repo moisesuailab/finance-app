@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {  
+  body {
+    @apply bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-50;
+  }
+}
+
+@layer utilities {
+  @keyframes slide-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out;
+  }
+}
+
+/* Remover outline e efeitos de seleção do Recharts */
+.recharts-wrapper *:focus,
+.recharts-wrapper *:active {
+  outline: none !important;
+}
+
+.recharts-surface {
+  outline: none !important;
+}
+
+.recharts-bar-rectangle,
+.recharts-rectangle {
+  outline: none !important;
+}
+
+/* Prevenir seleção de texto no gráfico */
+.recharts-wrapper {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
