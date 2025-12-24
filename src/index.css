@@ -5,8 +5,29 @@
 @tailwind utilities;
 
 @layer base {  
+
+  /* Prevenir seleção de texto em todo o app */
+  * {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    -webkit-tap-highlight-color: transparent; /* Remove highlight azul no mobile */
+    -webkit-touch-callout: none; /* Remove menu de contexto no iOS */
+  }
+
   body {
     @apply bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-50;
+  }
+
+  /* Permitir seleção apenas em inputs e áreas de texto */
+  input,
+  textarea,
+  [contenteditable="true"] {
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
   }
 }
 
