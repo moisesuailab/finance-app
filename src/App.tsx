@@ -64,7 +64,7 @@ function App() {
   const renderPage = () => {
     switch (activeTab) {
       case 'home':
-        return <Home />
+        return <Home onNavigate={setActiveTab} />
       case 'transactions':
         return <Transactions />
       case 'accounts':
@@ -74,7 +74,7 @@ function App() {
       case 'reports':
         return <Reports />
       default:
-        return <Home />
+        return <Home onNavigate={setActiveTab} />
     }
   }
 
