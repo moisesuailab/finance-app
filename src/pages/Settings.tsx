@@ -61,7 +61,8 @@ export function Settings() {
       URL.revokeObjectURL(url);
 
       toast.success("Dados exportados com sucesso!");
-    } catch {
+    } catch (error) {
+      console.error('Erro ao exportar:', error);
       toast.error("Erro ao exportar dados");
     }
   };
@@ -74,10 +75,17 @@ export function Settings() {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
+      setIsLoading(true);
       try {
         const text = await file.text();
         const data = JSON.parse(text);
 
+        // Validação básica do formato
+        if (!data.accounts && !data.categories && !data.transactions && !data.budgets) {
+          throw new Error('Arquivo não contém dados válidos');
+        }
+
+        // Limpar TODOS os dados antes de importar
         await db.transaction(
           "rw",
           db.accounts,
@@ -85,18 +93,37 @@ export function Settings() {
           db.transactions,
           db.budgets,
           async () => {
-            if (data.accounts) await db.accounts.bulkAdd(data.accounts);
-            if (data.categories) await db.categories.bulkAdd(data.categories);
-            if (data.transactions)
+            // Limpar tudo primeiro
+            await db.accounts.clear();
+            await db.categories.clear();
+            await db.transactions.clear();
+            await db.budgets.clear();
+
+            // Importar novos dados (bulkAdd agora funciona pois as tabelas estão vazias)
+            if (data.accounts && data.accounts.length > 0) {
+              await db.accounts.bulkAdd(data.accounts);
+            }
+            if (data.categories && data.categories.length > 0) {
+              await db.categories.bulkAdd(data.categories);
+            }
+            if (data.transactions && data.transactions.length > 0) {
               await db.transactions.bulkAdd(data.transactions);
-            if (data.budgets) await db.budgets.bulkAdd(data.budgets);
+            }
+            if (data.budgets && data.budgets.length > 0) {
+              await db.budgets.bulkAdd(data.budgets);
+            }
           }
         );
 
         toast.success("Dados importados com sucesso!");
-        window.location.reload();
-      } catch {
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      } catch (error) {
+        console.error('Erro ao importar:', error);
         toast.error("Erro ao importar dados. Verifique o arquivo.");
+      } finally {
+        setIsLoading(false);
       }
     };
     input.click();
@@ -121,8 +148,11 @@ export function Settings() {
 
       toast.success("Todos os dados foram apagados!");
       setShowClearDialog(false);
-      window.location.reload();
-    } catch {
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      console.error('Erro ao limpar dados:', error);
       toast.error("Erro ao apagar dados");
     } finally {
       setIsLoading(false);
@@ -131,7 +161,7 @@ export function Settings() {
 
   return (
     <MobileLayout>
-      <Header title="Configurações" />
+      <Header title="Ajustes" />
 
       <div className="p-4 sm:p-6 space-y-6">
         {/* Aparência */}
@@ -184,7 +214,8 @@ export function Settings() {
               <CardContent className="p-4">
                 <button
                   onClick={handleExportData}
-                  className="w-full flex items-center gap-3 text-left"
+                  disabled={isLoading}
+                  className="w-full flex items-center gap-3 text-left disabled:opacity-50"
                 >
                   <Download className="w-5 h-5 text-stone-700 dark:text-stone-300" />
                   <div>
@@ -203,7 +234,8 @@ export function Settings() {
               <CardContent className="p-4">
                 <button
                   onClick={handleImportData}
-                  className="w-full flex items-center gap-3 text-left"
+                  disabled={isLoading}
+                  className="w-full flex items-center gap-3 text-left disabled:opacity-50"
                 >
                   <Upload className="w-5 h-5 text-stone-700 dark:text-stone-300" />
                   <div>
@@ -211,7 +243,7 @@ export function Settings() {
                       Importar Dados
                     </p>
                     <p className="text-sm text-stone-500">
-                      Restaurar backup de arquivo
+                      Substituir todos os dados por backup
                     </p>
                   </div>
                 </button>
@@ -222,7 +254,8 @@ export function Settings() {
               <CardContent className="p-4">
                 <button
                   onClick={() => setShowClearDialog(true)}
-                  className="w-full flex items-center gap-3 text-left"
+                  disabled={isLoading}
+                  className="w-full flex items-center gap-3 text-left disabled:opacity-50"
                 >
                   <Trash2 className="w-5 h-5 text-red-600 dark:text-red-500" />
                   <div>
