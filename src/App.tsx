@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { BottomNav, type TabType } from '@/components/layout/BottomNav'
 import { Home } from '@/pages/Home'
-import { Transactions } from '@/pages/Transactions'
 import { Accounts } from '@/pages/Accounts'
 import { Categories } from '@/pages/Categories'
 import { Reports } from '@/pages/Reports'
+import { Settings } from '@/pages/Settings'
 import { Welcome } from '@/pages/Welcome'
 import { useAccountStore } from '@/stores/useAccountStore'
 import { useCategoryStore } from '@/stores/useCategoryStore'
@@ -65,14 +65,14 @@ function App() {
     switch (activeTab) {
       case 'home':
         return <Home onNavigate={setActiveTab} />
-      case 'transactions':
-        return <Transactions />
       case 'accounts':
         return <Accounts />
       case 'categories':
         return <Categories />
       case 'reports':
         return <Reports />
+      case 'settings':
+        return <Settings />
       default:
         return <Home onNavigate={setActiveTab} />
     }
