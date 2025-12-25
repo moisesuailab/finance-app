@@ -3,25 +3,28 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Wallet,
-  TrendingUp,
   Clock,
-  Settings,
+  Search,
+  Plus,
+  Download,
 } from "lucide-react";
 import { MobileLayout } from "@/components/layout/MobileLayout";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent } from "@/components/ui/Card";
 import { MonthSelector } from "@/components/ui/MonthSelector";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 import { useAccountStore } from "@/stores/useAccountStore";
 import { useTransactionStore } from "@/stores/useTransactionStore";
 import { useCategoryStore } from "@/stores/useCategoryStore";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { isInMonthRange } from "@/lib/dateUtils";
 import { TransactionForm } from "@/components/forms/TransactionForm";
-import { SettingsDrawer } from "@/components/modals/SettingsDrawer";
+import { ExportModal } from "@/components/modals/ExportModal";
 
 interface HomeProps {
   onNavigate: (
-    tab: "home" | "transactions" | "accounts" | "categories" | "reports"
+    tab: "home" | "accounts" | "categories" | "reports" | "settings"
   ) => void;
 }
 
@@ -34,7 +37,8 @@ export function Home({ onNavigate }: HomeProps) {
   const [initialTransactionType, setInitialTransactionType] = useState<
     "income" | "expense"
   >("income");
-  const [showSettings, setShowSettings] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const accounts = useAccountStore((state) => state.accounts);
   const transactions = useTransactionStore((state) => state.transactions);
@@ -59,18 +63,20 @@ export function Home({ onNavigate }: HomeProps) {
     return { income, expenses, balance, monthBalance };
   }, [transactions, accounts, selectedMonth]);
 
-  const recentTransactions = useMemo(() => {
+  const filteredTransactions = useMemo(() => {
     return [...transactions]
       .filter((t) => isInMonthRange(new Date(t.date), selectedMonth))
+      .filter((t) =>
+        t.description.toLowerCase().includes(searchTerm.toLowerCase())
+      )
       .sort((a, b) => {
         // Pendentes primeiro
         if (a.status === "pending" && b.status !== "pending") return -1;
         if (a.status !== "pending" && b.status === "pending") return 1;
         // Depois por data
         return new Date(b.date).getTime() - new Date(a.date).getTime();
-      })
-      .slice(0, 5);
-  }, [transactions, selectedMonth]);
+      });
+  }, [transactions, selectedMonth, searchTerm]);
 
   const getCategoryName = (categoryId: number) => {
     return categories.find((c) => c.id === categoryId)?.name || "Sem categoria";
@@ -101,12 +107,22 @@ export function Home({ onNavigate }: HomeProps) {
       <Header
         title="Início"
         action={
-          <button
-            onClick={() => setShowSettings(true)}
-            className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
-          >
-            <Settings className="w-5 h-5 text-stone-600 dark:text-stone-400" />
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowExport(true)}
+              className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
+            >
+              <Download className="w-5 h-5 text-stone-600 dark:text-stone-400" />
+            </button>
+            <Button
+              size="sm"
+              onClick={() => setShowForm(true)}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Nova</span>
+            </Button>
+          </div>
         }
       />
 
@@ -181,24 +197,38 @@ export function Home({ onNavigate }: HomeProps) {
           </Card>
         </div>
 
-        {/* Transações Recentes */}
+        {/* Busca */}
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
+          <Input
+            placeholder="Buscar transações..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-12"
+          />
+        </div>
+
+        {/* Transações */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-50">
-              Transações Recentes
+              Transações
             </h2>
-            <TrendingUp className="w-5 h-5 text-stone-400" />
           </div>
 
-          {recentTransactions.length === 0 ? (
+          {filteredTransactions.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center">
-                <p className="text-stone-500">Nenhuma transação neste mês</p>
+                <p className="text-stone-500">
+                  {searchTerm
+                    ? "Nenhuma transação encontrada"
+                    : "Nenhuma transação neste mês"}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-2">
-              {recentTransactions.map((transaction) => (
+              {filteredTransactions.map((transaction) => (
                 <Card
                   key={transaction.id}
                   onClick={() => handleEdit(transaction.id!)}
@@ -257,14 +287,20 @@ export function Home({ onNavigate }: HomeProps) {
               ))}
             </div>
           )}
+
+          {/* Contador de transações */}
+          {filteredTransactions.length > 0 && (
+            <p className="text-center text-sm text-stone-500 mt-3">
+              {filteredTransactions.length}{" "}
+              {filteredTransactions.length === 1 ? "transação" : "transações"}
+              {searchTerm && " encontrada(s)"}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Settings Drawer */}
-      <SettingsDrawer
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-      />
+      {/* Modal de Exportação */}
+      <ExportModal isOpen={showExport} onClose={() => setShowExport(false)} />
 
       {/* Formulário de Transação */}
       {showForm && (
