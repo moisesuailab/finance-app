@@ -1,7 +1,7 @@
-import { Home, TrendingUp, Wallet, Tag, BarChart3 } from 'lucide-react'
+import { Home, Wallet, Tag, BarChart3, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type TabType = 'home' | 'transactions' | 'accounts' | 'categories' | 'reports'
+export type TabType = 'home' | 'accounts' | 'categories' | 'reports' | 'settings'
 
 interface BottomNavProps {
   activeTab: TabType
@@ -9,11 +9,11 @@ interface BottomNavProps {
 }
 
 const tabs = [
-  { id: 'transactions' as TabType, label: 'Transações', icon: TrendingUp },
   { id: 'accounts' as TabType, label: 'Contas', icon: Wallet },
-  { id: 'home' as TabType, label: 'Início', icon: Home },
   { id: 'categories' as TabType, label: 'Categorias', icon: Tag },
+  { id: 'home' as TabType, label: 'Início', icon: Home },
   { id: 'reports' as TabType, label: 'Relatórios', icon: BarChart3 },
+  { id: 'settings' as TabType, label: 'Ajustes', icon: Settings },
 ]
 
 export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
