@@ -1,66 +1,69 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useTransactionStore } from "@/stores/useTransactionStore";
-import {
-  shouldGenerateRecurrence,
-  getNextRecurrenceDate,
-} from "@/lib/recurrence";
-import { startOfDay } from "date-fns";
+import { db } from "@/lib/db";
+import { generateMissingRecurrenceDates } from "@/lib/recurrence";
+import { parseISO } from "date-fns";
 
 export function useRecurringTransactions() {
-  const { transactions, addTransaction } = useTransactionStore();
+  const { transactions, fetchTransactions } = useTransactionStore();
+  const isProcessingRef = useRef(false);
 
   useEffect(() => {
-    const checkAndGenerateRecurring = async () => {
-      const recurringTransactions = transactions.filter(
-        (t) => t.isRecurring && t.recurrenceType !== "none"
-      );
+    const processRecurringTransactions = async () => {
+      if (isProcessingRef.current) return;
+      isProcessingRef.current = true;
 
-      for (const transaction of recurringTransactions) {
-        const lastDate = new Date(transaction.date);
+      try {
+        const recurringTransactions = transactions.filter(
+          (t) => t.isRecurring && t.recurrenceType !== "none" && t.id
+        );
 
-        if (
-          shouldGenerateRecurrence(
-            lastDate,
+        for (const transaction of recurringTransactions) {
+          const alreadyGenerated = transaction.generatedDates || [];
+
+          const missingDates = generateMissingRecurrenceDates(
+            new Date(transaction.date),
             transaction.recurrenceType,
             transaction.recurrenceEndDate
-          )
-        ) {
-          const nextDate = getNextRecurrenceDate(
-            lastDate,
-            transaction.recurrenceType
+              ? new Date(transaction.recurrenceEndDate)
+              : undefined,
+            alreadyGenerated
           );
 
-          if (nextDate) {
-            const exists = transactions.some(
-              (t) =>
-                t.description === transaction.description &&
-                t.categoryId === transaction.categoryId &&
-                t.accountId === transaction.accountId &&
-                t.amount === transaction.amount &&
-                startOfDay(new Date(t.date)).getTime() ===
-                  startOfDay(nextDate).getTime()
-            );
+          if (missingDates.length === 0) continue;
 
-            if (!exists) {
-              await addTransaction({
-                type: transaction.type,
-                status: "pending",
-                amount: transaction.amount,
-                description: transaction.description,
-                categoryId: transaction.categoryId,
-                accountId: transaction.accountId,
-                date: nextDate,
-                isRecurring: false,
-                recurrenceType: "none",
-                recurrenceEndDate: undefined,
-                tags: transaction.tags,
-              });
-            }
-          }
+          const newTransactions = missingDates.map((dateISO) => ({
+            accountId: transaction.accountId,
+            categoryId: transaction.categoryId,
+            type: transaction.type,
+            status: "pending" as const,
+            amount: transaction.amount,
+            description: transaction.description,
+            date: parseISO(dateISO),
+            isRecurring: false,
+            recurrenceType: "none" as const,
+            tags: transaction.tags,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }));
+
+          await db.transactions.bulkAdd(newTransactions);
+
+          const updatedGeneratedDates = [...alreadyGenerated, ...missingDates];
+          await db.transactions.update(transaction.id!, {
+            generatedDates: updatedGeneratedDates,
+            updatedAt: new Date(),
+          });
         }
+
+        await fetchTransactions();
+      } catch (error) {
+        console.error("Erro ao processar recorrências:", error);
+      } finally {
+        isProcessingRef.current = false;
       }
     };
 
-    checkAndGenerateRecurring();
-  }, [transactions, addTransaction]);
+    processRecurringTransactions();
+  }, [transactions, fetchTransactions]);
 }
