@@ -1,72 +1,109 @@
-import { addDays, addWeeks, addMonths, addYears, isAfter } from 'date-fns'
+import { addDays, addWeeks, addMonths, addYears, isAfter, startOfDay, format } from 'date-fns'
 import type { RecurrenceType } from '@/types/finance'
 
+export function dateToISO(date: Date): string {
+  return format(startOfDay(date), 'yyyy-MM-dd')
+}
+
 export function getNextRecurrenceDate(
-  lastDate: Date,
-  recurrenceType: RecurrenceType
+  baseDate: Date,
+  recurrenceType: RecurrenceType,
+  occurrenceNumber: number = 1
 ): Date | null {
+  if (recurrenceType === 'none') return null
+  
+  const base = startOfDay(baseDate)
+  
   switch (recurrenceType) {
     case 'daily':
-      return addDays(lastDate, 1)
+      return addDays(base, occurrenceNumber)
     case 'weekly':
-      return addWeeks(lastDate, 1)
+      return addWeeks(base, occurrenceNumber)
     case 'monthly':
-      return addMonths(lastDate, 1)
+      return addMonths(base, occurrenceNumber)
     case 'yearly':
-      return addYears(lastDate, 1)
-    case 'none':
-      return null
+      return addYears(base, occurrenceNumber)
     default:
       return null
   }
 }
 
-export function shouldGenerateRecurrence(
-  lastGeneratedDate: Date,
-  recurrenceType: RecurrenceType,
-  recurrenceEndDate?: Date
-): boolean {
-  if (recurrenceType === 'none') return false
-  
-  const nextDate = getNextRecurrenceDate(lastGeneratedDate, recurrenceType)
-  if (!nextDate) return false
-  
-  const now = new Date()
-  
-  // Verificar se já passou da data
-  if (isAfter(now, nextDate)) {
-    // Verificar se não ultrapassou a data final
-    if (recurrenceEndDate && isAfter(nextDate, recurrenceEndDate)) {
-      return false
-    }
-    return true
-  }
-  
-  return false
-}
-
-export function generateRecurringTransactions(
+export function generateMissingRecurrenceDates(
   baseDate: Date,
   recurrenceType: RecurrenceType,
   recurrenceEndDate: Date | undefined,
-  maxOccurrences: number = 12
-): Date[] {
+  alreadyGeneratedDates: string[]
+): string[] {
   if (recurrenceType === 'none') return []
   
-  const dates: Date[] = []
-  let currentDate = baseDate
+  const today = startOfDay(new Date())
+  const base = startOfDay(baseDate)
+  const endDate = recurrenceEndDate ? startOfDay(recurrenceEndDate) : null
   
-  for (let i = 0; i < maxOccurrences; i++) {
-    const nextDate = getNextRecurrenceDate(currentDate, recurrenceType)
+  const missingDates: string[] = []
+  let occurrenceNumber = 1
+  const maxOccurrences = 1000
+  
+  while (occurrenceNumber < maxOccurrences) {
+    const nextDate = getNextRecurrenceDate(base, recurrenceType, occurrenceNumber)
+    
     if (!nextDate) break
     
-    // Parar se ultrapassou a data final
-    if (recurrenceEndDate && isAfter(nextDate, recurrenceEndDate)) {
-      break
+    if (isAfter(nextDate, today)) break
+    
+    if (endDate && isAfter(nextDate, endDate)) break
+    
+    const dateISO = dateToISO(nextDate)
+    
+    if (!alreadyGeneratedDates.includes(dateISO)) {
+      missingDates.push(dateISO)
     }
     
-    dates.push(nextDate)
-    currentDate = nextDate
+    occurrenceNumber++
+  }
+  
+  return missingDates
+}
+
+export function hasPendingRecurrences(
+  baseDate: Date,
+  recurrenceType: RecurrenceType,
+  recurrenceEndDate: Date | undefined,
+  alreadyGeneratedDates: string[]
+): boolean {
+  const missing = generateMissingRecurrenceDates(
+    baseDate,
+    recurrenceType,
+    recurrenceEndDate,
+    alreadyGeneratedDates
+  )
+  
+  return missing.length > 0
+}
+
+export function getAllRecurrenceDates(
+  baseDate: Date,
+  recurrenceType: RecurrenceType,
+  recurrenceEndDate: Date | undefined,
+  maxOccurrences: number = 100
+): string[] {
+  if (recurrenceType === 'none') return []
+  
+  const base = startOfDay(baseDate)
+  const endDate = recurrenceEndDate ? startOfDay(recurrenceEndDate) : null
+  
+  const dates: string[] = []
+  let occurrenceNumber = 1
+  
+  while (occurrenceNumber <= maxOccurrences) {
+    const nextDate = getNextRecurrenceDate(base, recurrenceType, occurrenceNumber)
+    
+    if (!nextDate) break
+    
+    if (endDate && isAfter(nextDate, endDate)) break
+    
+    dates.push(dateToISO(nextDate))
+    occurrenceNumber++
   }
   
   return dates
