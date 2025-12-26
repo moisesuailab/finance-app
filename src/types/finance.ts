@@ -33,10 +33,12 @@ export interface Transaction {
   status: TransactionStatus
   amount: number
   description: string
+  baseDescription?: string
   date: Date
   isRecurring: boolean
   recurrenceType: RecurrenceType
   recurrenceOccurrences?: number
+  isInstallment?: boolean
   generatedDates?: string[]
   tags?: string[]
   createdAt: Date
