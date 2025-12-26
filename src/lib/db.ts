@@ -71,6 +71,31 @@ class FinanceDatabase extends Dexie {
         delete transaction.recurrenceEndDate
       })
     })
+
+    this.version(5).stores({
+      transactions: '++id, accountId, categoryId, type, status, date, createdAt'
+    }).upgrade(tx => {
+      return tx.table('transactions').toCollection().modify((transaction: Transaction) => {
+        if (transaction.isRecurring && transaction.isInstallment === undefined) {
+          transaction.isInstallment = false
+        }
+      })
+    })
+
+    this.version(6).stores({
+      transactions: '++id, accountId, categoryId, type, status, date, createdAt'
+    }).upgrade(tx => {
+      return tx.table('transactions').toCollection().modify((transaction: Transaction) => {
+        if (transaction.isInstallment && transaction.description) {
+          const match = transaction.description.match(/^(.+) - \d+\/\d+$/)
+          if (match) {
+            transaction.baseDescription = match[1]
+          } else {
+            transaction.baseDescription = transaction.description
+          }
+        }
+      })
+    })
   }
 }
 
