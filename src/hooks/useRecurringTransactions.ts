@@ -24,9 +24,7 @@ export function useRecurringTransactions() {
           const missingDates = generateMissingRecurrenceDates(
             new Date(transaction.date),
             transaction.recurrenceType,
-            transaction.recurrenceEndDate
-              ? new Date(transaction.recurrenceEndDate)
-              : undefined,
+            transaction.recurrenceOccurrences,
             alreadyGenerated
           );
 
