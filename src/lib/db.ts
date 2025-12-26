@@ -26,6 +26,16 @@ class FinanceDatabase extends Dexie {
         }
       })
     })
+
+    this.version(3).stores({
+      transactions: '++id, accountId, categoryId, type, status, date, createdAt'
+    }).upgrade(tx => {
+      return tx.table('transactions').toCollection().modify(transaction => {
+        if (transaction.isRecurring && !transaction.generatedDates) {
+          transaction.generatedDates = []
+        }
+      })
+    })
   }
 }
 
