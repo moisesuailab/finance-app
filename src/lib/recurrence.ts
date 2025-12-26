@@ -1,5 +1,21 @@
-import { addDays, addWeeks, addMonths, addYears, isAfter, startOfDay, format } from 'date-fns'
+import { addDays, addWeeks, addMonths, addYears, isAfter, startOfDay, endOfMonth, format } from 'date-fns'
 import type { RecurrenceType } from '@/types/finance'
+
+export const RECURRENCE_LIMITS: Record<RecurrenceType, number> = {
+  none: 0,
+  daily: 365,
+  weekly: 104,
+  monthly: 600,
+  yearly: 100,
+}
+
+export const RECURRENCE_DEFAULTS: Record<RecurrenceType, number> = {
+  none: 0,
+  daily: 30,
+  weekly: 12,
+  monthly: 12,
+  yearly: 5,
+}
 
 export function dateToISO(date: Date): string {
   return format(startOfDay(date), 'yyyy-MM-dd')
@@ -19,8 +35,9 @@ export function getNextRecurrenceDate(
       return addDays(base, occurrenceNumber)
     case 'weekly':
       return addWeeks(base, occurrenceNumber)
-    case 'monthly':
+    case 'monthly': {
       return addMonths(base, occurrenceNumber)
+    }
     case 'yearly':
       return addYears(base, occurrenceNumber)
     default:
@@ -31,35 +48,29 @@ export function getNextRecurrenceDate(
 export function generateMissingRecurrenceDates(
   baseDate: Date,
   recurrenceType: RecurrenceType,
-  recurrenceEndDate: Date | undefined,
+  maxOccurrences: number | undefined,
   alreadyGeneratedDates: string[]
 ): string[] {
-  if (recurrenceType === 'none') return []
+  if (recurrenceType === 'none' || !maxOccurrences) return []
   
   const today = startOfDay(new Date())
+  const endOfCurrentMonth = endOfMonth(today)
   const base = startOfDay(baseDate)
-  const endDate = recurrenceEndDate ? startOfDay(recurrenceEndDate) : null
   
   const missingDates: string[] = []
-  let occurrenceNumber = 1
-  const maxOccurrences = 1000
   
-  while (occurrenceNumber < maxOccurrences) {
-    const nextDate = getNextRecurrenceDate(base, recurrenceType, occurrenceNumber)
+  for (let i = 1; i <= maxOccurrences; i++) {
+    const nextDate = getNextRecurrenceDate(base, recurrenceType, i)
     
     if (!nextDate) break
     
-    if (isAfter(nextDate, today)) break
-    
-    if (endDate && isAfter(nextDate, endDate)) break
+    if (isAfter(nextDate, endOfCurrentMonth)) break
     
     const dateISO = dateToISO(nextDate)
     
     if (!alreadyGeneratedDates.includes(dateISO)) {
       missingDates.push(dateISO)
     }
-    
-    occurrenceNumber++
   }
   
   return missingDates
@@ -68,13 +79,13 @@ export function generateMissingRecurrenceDates(
 export function hasPendingRecurrences(
   baseDate: Date,
   recurrenceType: RecurrenceType,
-  recurrenceEndDate: Date | undefined,
+  maxOccurrences: number | undefined,
   alreadyGeneratedDates: string[]
 ): boolean {
   const missing = generateMissingRecurrenceDates(
     baseDate,
     recurrenceType,
-    recurrenceEndDate,
+    maxOccurrences,
     alreadyGeneratedDates
   )
   
@@ -84,27 +95,57 @@ export function hasPendingRecurrences(
 export function getAllRecurrenceDates(
   baseDate: Date,
   recurrenceType: RecurrenceType,
-  recurrenceEndDate: Date | undefined,
-  maxOccurrences: number = 100
+  maxOccurrences: number = 12
 ): string[] {
   if (recurrenceType === 'none') return []
   
   const base = startOfDay(baseDate)
-  const endDate = recurrenceEndDate ? startOfDay(recurrenceEndDate) : null
-  
   const dates: string[] = []
-  let occurrenceNumber = 1
   
-  while (occurrenceNumber <= maxOccurrences) {
-    const nextDate = getNextRecurrenceDate(base, recurrenceType, occurrenceNumber)
+  for (let i = 1; i <= maxOccurrences; i++) {
+    const nextDate = getNextRecurrenceDate(base, recurrenceType, i)
     
     if (!nextDate) break
     
-    if (endDate && isAfter(nextDate, endDate)) break
-    
     dates.push(dateToISO(nextDate))
-    occurrenceNumber++
   }
   
   return dates
+}
+
+export function validateOccurrences(
+  recurrenceType: RecurrenceType,
+  occurrences: number
+): { valid: boolean; message?: string } {
+  if (recurrenceType === 'none') {
+    return { valid: true }
+  }
+  
+  const limit = RECURRENCE_LIMITS[recurrenceType]
+  
+  if (occurrences < 1) {
+    return { 
+      valid: false, 
+      message: 'O número de ocorrências deve ser no mínimo 1' 
+    }
+  }
+  
+  if (occurrences > limit) {
+    return { 
+      valid: false, 
+      message: `Máximo de ${limit} ocorrências para recorrência ${getRecurrenceLabel(recurrenceType)}` 
+    }
+  }
+  
+  return { valid: true }
+}
+
+function getRecurrenceLabel(type: RecurrenceType): string {
+  switch (type) {
+    case 'daily': return 'diária'
+    case 'weekly': return 'semanal'
+    case 'monthly': return 'mensal'
+    case 'yearly': return 'anual'
+    default: return ''
+  }
 }
