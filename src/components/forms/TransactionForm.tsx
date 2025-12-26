@@ -53,6 +53,7 @@ export function TransactionForm({
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>("monthly");
   const [recurrenceOccurrences, setRecurrenceOccurrences] = useState("");
+  const [isInstallment, setIsInstallment] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const { transactions, addTransaction, updateTransaction, deleteTransaction } =
@@ -63,14 +64,12 @@ export function TransactionForm({
   const isEditing = !!transactionId;
   const transaction = transactions.find((t) => t.id === transactionId);
 
-  // Filtrar categorias com useMemo para evitar loop
   const categories = useMemo(() => {
     return allCategories
       .filter((c) => c.type === type)
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [allCategories, type]);
 
-  // Carregar dados da transação ao editar
   useEffect(() => {
     if (transaction) {
       setType(transaction.type);
@@ -87,17 +86,16 @@ export function TransactionForm({
           ? String(transaction.recurrenceOccurrences) 
           : ""
       );
+      setIsInstallment(transaction.isInstallment || false);
     }
   }, [transaction]);
 
-  // Reset categoryId quando mudar o tipo
   useEffect(() => {
     if (!isEditing) {
       setCategoryId("");
     }
   }, [type, isEditing]);
 
-  // Setar primeira conta como padrão
   useEffect(() => {
     if (accounts.length > 0 && !accountId) {
       setAccountId(String(accounts[0].id));
@@ -107,10 +105,13 @@ export function TransactionForm({
   const handleToggleRecurring = () => {
     const newValue = !isRecurring;
     setIsRecurring(newValue);
-    
-    // Ao ATIVAR recorrência, se não está editando e campo vazio, sugere valor padrão
+
     if (newValue && !isEditing && recurrenceOccurrences === "") {
       setRecurrenceOccurrences(String(RECURRENCE_DEFAULTS[recurrenceType]));
+    }
+
+    if (!newValue) {
+      setIsInstallment(false);
     }
   };
 
@@ -154,11 +155,21 @@ export function TransactionForm({
 
     setIsLoading(true);
     try {
+      let finalDescription = description;
+      let baseDescription: string | undefined = undefined;
+      
+      if (isRecurring && recurrenceType === 'monthly' && isInstallment && recurrenceOccurrences) {
+        const totalOccurrences = parseInt(recurrenceOccurrences);
+        baseDescription = description;
+        finalDescription = `${description} - 1/${totalOccurrences}`;
+      }
+
       const transactionData = {
         type,
         status,
         amount: numAmount,
-        description,
+        description: finalDescription,
+        baseDescription,
         categoryId: parseInt(categoryId),
         accountId: parseInt(accountId),
         date: parseInputDate(date),
@@ -169,6 +180,9 @@ export function TransactionForm({
         recurrenceOccurrences: isRecurring && recurrenceOccurrences 
           ? parseInt(recurrenceOccurrences) 
           : undefined,
+        isInstallment: isRecurring && recurrenceType === 'monthly' 
+          ? isInstallment 
+          : false,
       };
 
       if (isEditing && transactionId) {
@@ -363,7 +377,12 @@ export function TransactionForm({
               label="Frequência"
               value={recurrenceType}
               onChange={(e) => {
-                setRecurrenceType(e.target.value as RecurrenceType);
+                const newType = e.target.value as RecurrenceType;
+                setRecurrenceType(newType);
+                // Reseta isInstallment se mudar para tipo diferente de mensal
+                if (newType !== 'monthly') {
+                  setIsInstallment(false);
+                }
               }}
             >
               <option value="none">Selecione...</option>
@@ -387,6 +406,35 @@ export function TransactionForm({
                 }
               }}
             />
+
+            {/* Toggle de parcelamento - só aparece em recorrência mensal */}
+            {recurrenceType === 'monthly' && (
+              <div className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-950 rounded-lg border border-stone-200 dark:border-stone-800">
+                <div>
+                  <p className="font-medium text-stone-900 dark:text-stone-50 text-sm">
+                    É um parcelamento?
+                  </p>
+                  <p className="text-xs text-stone-500">
+                    Adiciona contador de parcelas (ex: 1/12)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsInstallment(!isInstallment)}
+                  className={cn(
+                    "relative w-14 h-8 rounded-full transition-colors",
+                    isInstallment ? "bg-blue-600" : "bg-stone-300 dark:bg-stone-700"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "absolute top-1 w-6 h-6 rounded-full bg-white transition-transform shadow-md",
+                      isInstallment ? "translate-x-7" : "translate-x-1"
+                    )}
+                  />
+                </button>
+              </div>
+            )}
           </div>
         )}
 
