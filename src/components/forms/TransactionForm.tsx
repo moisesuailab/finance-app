@@ -9,19 +9,13 @@ import { useAccountStore } from "@/stores/useAccountStore";
 import { toast } from "react-toastify";
 import { cn } from "@/lib/utils";
 import { formatDateForInput, createDateInMonth, parseInputDate } from '@/lib/dateUtils';
+import { validateOccurrences, RECURRENCE_DEFAULTS } from "@/lib/recurrence";
 import { Repeat } from "lucide-react";
 import type {
   TransactionType,
   TransactionStatus,
   RecurrenceType,
 } from "@/types/finance";
-import {
-  addMonths,
-  addDays,
-  addWeeks,
-  addYears,
-  isBefore,
-} from "date-fns";
 
 interface TransactionFormProps {
   isOpen: boolean;
@@ -57,9 +51,8 @@ export function TransactionForm({
   });
 
   const [isRecurring, setIsRecurring] = useState(false);
-  const [recurrenceType, setRecurrenceType] =
-    useState<RecurrenceType>("monthly");
-  const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>("monthly");
+  const [recurrenceOccurrences, setRecurrenceOccurrences] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const { transactions, addTransaction, updateTransaction, deleteTransaction } =
@@ -89,9 +82,9 @@ export function TransactionForm({
       setDate(formatDateForInput(new Date(transaction.date)));
       setIsRecurring(transaction.isRecurring);
       setRecurrenceType(transaction.recurrenceType);
-      setRecurrenceEndDate(
-        transaction.recurrenceEndDate
-          ? formatDateForInput(new Date(transaction.recurrenceEndDate))
+      setRecurrenceOccurrences(
+        transaction.recurrenceOccurrences 
+          ? String(transaction.recurrenceOccurrences) 
           : ""
       );
     }
@@ -111,28 +104,13 @@ export function TransactionForm({
     }
   }, [accounts, accountId]);
 
-  // Sugerir data final (12 meses no futuro) quando ativar recorrência
-  useEffect(() => {
-    if (isRecurring && !recurrenceEndDate && !isEditing) {
-      const suggestedDate = addMonths(new Date(date), 12);
-      setRecurrenceEndDate(suggestedDate.toISOString().split("T")[0]);
-    }
-  }, [isRecurring, date, recurrenceEndDate, isEditing]);
-
-  // Validar data de recorrência
-  const getMinEndDate = () => {
-    const baseDate = new Date(date);
-    switch (recurrenceType) {
-      case "daily":
-        return addDays(baseDate, 1);
-      case "weekly":
-        return addWeeks(baseDate, 1);
-      case "monthly":
-        return addMonths(baseDate, 1);
-      case "yearly":
-        return addYears(baseDate, 1);
-      default:
-        return addDays(baseDate, 1);
+  const handleToggleRecurring = () => {
+    const newValue = !isRecurring;
+    setIsRecurring(newValue);
+    
+    // Ao ATIVAR recorrência, se não está editando e campo vazio, sugere valor padrão
+    if (newValue && !isEditing && recurrenceOccurrences === "") {
+      setRecurrenceOccurrences(String(RECURRENCE_DEFAULTS[recurrenceType]));
     }
   };
 
@@ -154,16 +132,23 @@ export function TransactionForm({
         return;
       }
 
-      if (recurrenceEndDate) {
-        const minDate = getMinEndDate();
-        const endDate = new Date(recurrenceEndDate);
+      if (!recurrenceOccurrences || recurrenceOccurrences.trim() === "") {
+        toast.error("Defina o número de ocorrências");
+        return;
+      }
 
-        if (isBefore(endDate, minDate)) {
-          toast.error(
-            `A data final deve ser pelo menos uma ocorrência após a data inicial`
-          );
-          return;
-        }
+      const numOccurrences = parseInt(recurrenceOccurrences);
+      
+      if (isNaN(numOccurrences) || numOccurrences < 1) {
+        toast.error("O número de ocorrências deve ser no mínimo 1");
+        return;
+      }
+
+      const validation = validateOccurrences(recurrenceType, numOccurrences);
+      
+      if (!validation.valid) {
+        toast.error(validation.message);
+        return;
       }
     }
 
@@ -181,7 +166,9 @@ export function TransactionForm({
         recurrenceType: isRecurring
           ? recurrenceType
           : ("none" as RecurrenceType),
-        recurrenceEndDate: isRecurring && recurrenceEndDate ? parseInputDate(recurrenceEndDate) : undefined,
+        recurrenceOccurrences: isRecurring && recurrenceOccurrences 
+          ? parseInt(recurrenceOccurrences) 
+          : undefined,
       };
 
       if (isEditing && transactionId) {
@@ -354,7 +341,7 @@ export function TransactionForm({
           </div>
           <button
             type="button"
-            onClick={() => setIsRecurring(!isRecurring)}
+            onClick={handleToggleRecurring}
             className={cn(
               "relative w-14 h-8 rounded-full transition-colors",
               isRecurring ? "bg-blue-600" : "bg-stone-300 dark:bg-stone-700"
@@ -375,9 +362,9 @@ export function TransactionForm({
             <Select
               label="Frequência"
               value={recurrenceType}
-              onChange={(e) =>
-                setRecurrenceType(e.target.value as RecurrenceType)
-              }
+              onChange={(e) => {
+                setRecurrenceType(e.target.value as RecurrenceType);
+              }}
             >
               <option value="none">Selecione...</option>
               <option value="daily">Diária</option>
@@ -387,11 +374,18 @@ export function TransactionForm({
             </Select>
 
             <Input
-              label="Encerrar em (opcional)"
-              type="date"
-              value={recurrenceEndDate}
-              onChange={(e) => setRecurrenceEndDate(e.target.value)}
-              min={getMinEndDate().toISOString().split("T")[0]}
+              label="Número de ocorrências"
+              type="text"
+              inputMode="numeric"
+              placeholder="Ex: 12"
+              value={recurrenceOccurrences}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Permite apenas números
+                if (value === "" || /^\d+$/.test(value)) {
+                  setRecurrenceOccurrences(value);
+                }
+              }}
             />
           </div>
         )}
