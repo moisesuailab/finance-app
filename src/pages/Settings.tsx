@@ -80,12 +80,10 @@ export function Settings() {
         const text = await file.text();
         const data = JSON.parse(text);
 
-        // Validação básica do formato
         if (!data.accounts && !data.categories && !data.transactions && !data.budgets) {
           throw new Error('Arquivo não contém dados válidos');
         }
 
-        // Limpar TODOS os dados antes de importar
         await db.transaction(
           "rw",
           db.accounts,
@@ -93,13 +91,11 @@ export function Settings() {
           db.transactions,
           db.budgets,
           async () => {
-            // Limpar tudo primeiro
             await db.accounts.clear();
             await db.categories.clear();
             await db.transactions.clear();
             await db.budgets.clear();
 
-            // Importar novos dados (bulkAdd agora funciona pois as tabelas estão vazias)
             if (data.accounts && data.accounts.length > 0) {
               await db.accounts.bulkAdd(data.accounts);
             }
@@ -145,6 +141,9 @@ export function Settings() {
           await db.budgets.clear();
         }
       );
+
+      // IMPORTANTE: Resetar flag de setup inicial
+      localStorage.removeItem('hasCompletedInitialSetup');
 
       toast.success("Todos os dados foram apagados!");
       setShowClearDialog(false);

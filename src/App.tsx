@@ -14,7 +14,6 @@ import { useRecurringTransactions } from '@/hooks/useRecurringTransactions'
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('home')
-  // Inicialização lazy: verifica localStorage apenas na primeira renderização
   const [showWelcome, setShowWelcome] = useState(() => {
     return !localStorage.getItem('hasSeenWelcome')
   })
@@ -24,10 +23,8 @@ function App() {
   const fetchCategories = useCategoryStore(state => state.fetchCategories)
   const fetchTransactions = useTransactionStore(state => state.fetchTransactions)
 
-  // Hook para gerar transações recorrentes
   useRecurringTransactions()
 
-  // Carregar dados ao iniciar
   useEffect(() => {
     if (isInitialized) {
       fetchAccounts()
@@ -36,7 +33,6 @@ function App() {
     }
   }, [isInitialized, fetchAccounts, fetchCategories, fetchTransactions])
 
-  // Scroll para o topo ao trocar de aba
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' })
   }, [activeTab])
@@ -64,7 +60,7 @@ function App() {
   const renderPage = () => {
     switch (activeTab) {
       case 'home':
-        return <Home onNavigate={setActiveTab} />
+        return <Home />
       case 'accounts':
         return <Accounts />
       case 'categories':
@@ -74,7 +70,7 @@ function App() {
       case 'settings':
         return <Settings />
       default:
-        return <Home onNavigate={setActiveTab} />
+        return <Home />
     }
   }
 

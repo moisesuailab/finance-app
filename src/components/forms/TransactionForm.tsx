@@ -70,6 +70,13 @@ export function TransactionForm({
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [allCategories, type]);
 
+  // NOVO: Filtrar apenas contas ativas de pagamento
+  const availableAccounts = useMemo(() => {
+    return accounts
+      .filter((a) => !a.isArchived && !a.excludeFromTotal)
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [accounts]);
+
   useEffect(() => {
     if (transaction) {
       setType(transaction.type);
@@ -97,10 +104,10 @@ export function TransactionForm({
   }, [type, isEditing]);
 
   useEffect(() => {
-    if (accounts.length > 0 && !accountId) {
-      setAccountId(String(accounts[0].id));
+    if (availableAccounts.length > 0 && !accountId) {
+      setAccountId(String(availableAccounts[0].id));
     }
-  }, [accounts, accountId]);
+  }, [availableAccounts, accountId]);
 
   const handleToggleRecurring = () => {
     const newValue = !isRecurring;
@@ -328,7 +335,7 @@ export function TransactionForm({
           onChange={(e) => setAccountId(e.target.value)}
         >
           <option value="">Selecione uma conta</option>
-          {accounts.map((account) => (
+          {availableAccounts.map((account) => (
             <option key={account.id} value={account.id}>
               {account.name}
             </option>
@@ -379,7 +386,6 @@ export function TransactionForm({
               onChange={(e) => {
                 const newType = e.target.value as RecurrenceType;
                 setRecurrenceType(newType);
-                // Reseta isInstallment se mudar para tipo diferente de mensal
                 if (newType !== 'monthly') {
                   setIsInstallment(false);
                 }
@@ -400,14 +406,12 @@ export function TransactionForm({
               value={recurrenceOccurrences}
               onChange={(e) => {
                 const value = e.target.value;
-                // Permite apenas números
                 if (value === "" || /^\d+$/.test(value)) {
                   setRecurrenceOccurrences(value);
                 }
               }}
             />
 
-            {/* Toggle de parcelamento - só aparece em recorrência mensal */}
             {recurrenceType === 'monthly' && (
               <div className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-950 rounded-lg border border-stone-200 dark:border-stone-800">
                 <div>

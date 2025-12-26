@@ -96,6 +96,26 @@ class FinanceDatabase extends Dexie {
         }
       })
     })
+
+    this.version(7).stores({
+      accounts: '++id, name, currentBalance, isArchived, excludeFromTotal, createdAt',
+      transactions: '++id, accountId, categoryId, type, status, date, fromAccountId, toAccountId, createdAt'
+    }).upgrade(tx => {
+      return tx.table('accounts').toCollection().modify((account: Account) => {
+        if (account.excludeFromTotal === undefined) {
+          account.excludeFromTotal = false
+        }
+        if (account.isArchived === undefined) {
+          account.isArchived = false
+        }
+        if (account.archivedAt === undefined) {
+          account.archivedAt = undefined
+        }
+        if (account.description === undefined) {
+          account.description = undefined
+        }
+      })
+    })
   }
 }
 

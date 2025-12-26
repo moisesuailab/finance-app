@@ -1,4 +1,4 @@
-export type TransactionType = 'income' | 'expense'
+export type TransactionType = 'income' | 'expense' | 'transfer'
 
 export type TransactionStatus = 'pending' | 'completed'
 
@@ -17,10 +17,14 @@ export interface Category {
 export interface Account {
   id?: number
   name: string
+  description?: string
   initialBalance: number
   currentBalance: number
   color: string
   icon: string
+  excludeFromTotal?: boolean
+  isArchived?: boolean
+  archivedAt?: Date
   createdAt: Date
   updatedAt: Date
 }
@@ -40,6 +44,10 @@ export interface Transaction {
   recurrenceOccurrences?: number
   isInstallment?: boolean
   generatedDates?: string[]
+  
+  fromAccountId?: number
+  toAccountId?: number
+  
   tags?: string[]
   createdAt: Date
   updatedAt: Date
