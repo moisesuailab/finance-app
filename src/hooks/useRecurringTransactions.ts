@@ -30,20 +30,33 @@ export function useRecurringTransactions() {
 
           if (missingDates.length === 0) continue;
 
-          const newTransactions = missingDates.map((dateISO) => ({
-            accountId: transaction.accountId,
-            categoryId: transaction.categoryId,
-            type: transaction.type,
-            status: "pending" as const,
-            amount: transaction.amount,
-            description: transaction.description,
-            date: parseISO(dateISO),
-            isRecurring: false,
-            recurrenceType: "none" as const,
-            tags: transaction.tags,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }));
+          const startIndex = (transaction.isInstallment ? 1 : 0) + alreadyGenerated.length + 1;
+          const totalOccurrences = transaction.recurrenceOccurrences || 0;
+          const isInstallment = transaction.isInstallment || false;
+          const baseDesc = transaction.baseDescription || transaction.description;
+
+          const newTransactions = missingDates.map((dateISO, index) => {
+            let description = baseDesc;
+            if (isInstallment && totalOccurrences > 0) {
+              const currentInstallment = startIndex + index;
+              description = `${baseDesc} - ${currentInstallment}/${totalOccurrences}`;
+            }
+
+            return {
+              accountId: transaction.accountId,
+              categoryId: transaction.categoryId,
+              type: transaction.type,
+              status: "pending" as const,
+              amount: transaction.amount,
+              description,
+              date: parseISO(dateISO),
+              isRecurring: false,
+              recurrenceType: "none" as const,
+              tags: transaction.tags,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            }
+          });
 
           await db.transactions.bulkAdd(newTransactions);
 
