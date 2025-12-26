@@ -36,7 +36,7 @@ export interface Transaction {
   date: Date
   isRecurring: boolean
   recurrenceType: RecurrenceType
-  recurrenceEndDate?: Date
+  recurrenceOccurrences?: number
   generatedDates?: string[]
   tags?: string[]
   createdAt: Date
