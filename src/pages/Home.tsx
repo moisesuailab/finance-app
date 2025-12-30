@@ -181,7 +181,8 @@ export function Home() {
         const matchesType = 
             (activeFilters.has('income') && t.type === 'income') ||
             (activeFilters.has('expense') && t.type === 'expense') ||
-            (!activeFilters.has('income') && !activeFilters.has('expense'));
+            (activeFilters.has('transfer') && t.type === 'transfer') ||
+            (!activeFilters.has('income') && !activeFilters.has('expense') && !activeFilters.has('transfer'));
         
         // Filtro de status
         const matchesStatus = 
@@ -483,6 +484,19 @@ export function Home() {
             `}
             >
             Saídas
+          </button>
+
+          <button
+            onClick={() => handleFilterToggle('transfer')}
+            className={`
+                px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
+                ${activeFilters.has('transfer')
+                ? 'bg-stone-900 dark:bg-stone-50 text-white dark:text-stone-900 border-2 border-stone-900 dark:border-stone-50'
+                : 'bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-2 border-transparent hover:bg-stone-300 dark:hover:bg-stone-700'
+                }
+            `}
+            >
+            Transferências
           </button>
         </div>
 
