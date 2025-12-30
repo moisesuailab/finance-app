@@ -51,7 +51,7 @@ export function generateMissingRecurrenceDates(
   maxOccurrences: number | undefined,
   alreadyGeneratedDates: string[]
 ): string[] {
-  if (recurrenceType === 'none' || !maxOccurrences) return []
+  if (recurrenceType === 'none') return []
   
   const today = startOfDay(new Date())
   const endOfCurrentMonth = endOfMonth(today)
@@ -59,7 +59,9 @@ export function generateMissingRecurrenceDates(
   
   const missingDates: string[] = []
   
-  for (let i = 1; i <= maxOccurrences; i++) {
+  const limit = maxOccurrences ?? 999
+  
+  for (let i = 1; i <= limit; i++) {
     const nextDate = getNextRecurrenceDate(base, recurrenceType, i)
     
     if (!nextDate) break

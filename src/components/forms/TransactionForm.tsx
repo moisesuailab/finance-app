@@ -8,7 +8,11 @@ import { useCategoryStore } from "@/stores/useCategoryStore";
 import { useAccountStore } from "@/stores/useAccountStore";
 import { toast } from "react-toastify";
 import { cn } from "@/lib/utils";
-import { formatDateForInput, createDateInMonth, parseInputDate } from '@/lib/dateUtils';
+import {
+  formatDateForInput,
+  createDateInMonth,
+  parseInputDate,
+} from "@/lib/dateUtils";
 import { validateOccurrences, RECURRENCE_DEFAULTS } from "@/lib/recurrence";
 import { Repeat } from "lucide-react";
 import type {
@@ -51,9 +55,11 @@ export function TransactionForm({
   });
 
   const [isRecurring, setIsRecurring] = useState(false);
-  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>("monthly");
+  const [recurrenceType, setRecurrenceType] =
+    useState<RecurrenceType>("monthly");
   const [recurrenceOccurrences, setRecurrenceOccurrences] = useState("");
   const [isInstallment, setIsInstallment] = useState(false);
+  const [isIndeterminate, setIsIndeterminate] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const { transactions, addTransaction, updateTransaction, deleteTransaction } =
@@ -89,11 +95,14 @@ export function TransactionForm({
       setIsRecurring(transaction.isRecurring);
       setRecurrenceType(transaction.recurrenceType);
       setRecurrenceOccurrences(
-        transaction.recurrenceOccurrences 
-          ? String(transaction.recurrenceOccurrences) 
+        transaction.recurrenceOccurrences
+          ? String(transaction.recurrenceOccurrences)
           : ""
       );
       setIsInstallment(transaction.isInstallment || false);
+      setIsIndeterminate(
+        !transaction.recurrenceOccurrences && transaction.isRecurring
+      );
     }
   }, [transaction]);
 
@@ -113,12 +122,18 @@ export function TransactionForm({
     const newValue = !isRecurring;
     setIsRecurring(newValue);
 
-    if (newValue && !isEditing && recurrenceOccurrences === "") {
+    if (
+      newValue &&
+      !isEditing &&
+      recurrenceOccurrences === "" &&
+      !isIndeterminate
+    ) {
       setRecurrenceOccurrences(String(RECURRENCE_DEFAULTS[recurrenceType]));
     }
 
     if (!newValue) {
       setIsInstallment(false);
+      setIsIndeterminate(false);
     }
   };
 
@@ -140,23 +155,28 @@ export function TransactionForm({
         return;
       }
 
-      if (!recurrenceOccurrences || recurrenceOccurrences.trim() === "") {
-        toast.error("Defina o número de ocorrências");
-        return;
-      }
+      // Validar ocorrências apenas se NÃO for indeterminado
+      if (!isIndeterminate) {
+        if (!recurrenceOccurrences || recurrenceOccurrences.trim() === "") {
+          toast.error(
+            "Defina o número de ocorrências ou marque como indeterminado"
+          );
+          return;
+        }
 
-      const numOccurrences = parseInt(recurrenceOccurrences);
-      
-      if (isNaN(numOccurrences) || numOccurrences < 1) {
-        toast.error("O número de ocorrências deve ser no mínimo 1");
-        return;
-      }
+        const numOccurrences = parseInt(recurrenceOccurrences);
 
-      const validation = validateOccurrences(recurrenceType, numOccurrences);
-      
-      if (!validation.valid) {
-        toast.error(validation.message);
-        return;
+        if (isNaN(numOccurrences) || numOccurrences < 1) {
+          toast.error("O número de ocorrências deve ser no mínimo 1");
+          return;
+        }
+
+        const validation = validateOccurrences(recurrenceType, numOccurrences);
+
+        if (!validation.valid) {
+          toast.error(validation.message);
+          return;
+        }
       }
     }
 
@@ -164,8 +184,13 @@ export function TransactionForm({
     try {
       let finalDescription = description;
       let baseDescription: string | undefined = undefined;
-      
-      if (isRecurring && recurrenceType === 'monthly' && isInstallment && recurrenceOccurrences) {
+
+      if (
+        isRecurring &&
+        recurrenceType === "monthly" &&
+        isInstallment &&
+        recurrenceOccurrences
+      ) {
         const totalOccurrences = parseInt(recurrenceOccurrences);
         baseDescription = description;
         finalDescription = `${description} - 1/${totalOccurrences}`;
@@ -184,12 +209,15 @@ export function TransactionForm({
         recurrenceType: isRecurring
           ? recurrenceType
           : ("none" as RecurrenceType),
-        recurrenceOccurrences: isRecurring && recurrenceOccurrences 
-          ? parseInt(recurrenceOccurrences) 
+        recurrenceOccurrences: isRecurring
+          ? isIndeterminate
+            ? undefined
+            : parseInt(recurrenceOccurrences)
           : undefined,
-        isInstallment: isRecurring && recurrenceType === 'monthly' 
-          ? isInstallment 
-          : false,
+        isInstallment:
+          isRecurring && recurrenceType === "monthly" && !isIndeterminate
+            ? isInstallment
+            : false,
       };
 
       if (isEditing && transactionId) {
@@ -204,8 +232,10 @@ export function TransactionForm({
         );
       }
       onClose();
-    } catch {
-      toast.error("Erro ao salvar transação");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro ao salvar transação";
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -219,8 +249,10 @@ export function TransactionForm({
       await deleteTransaction(transactionId);
       toast.success("Transação excluída com sucesso!");
       onClose();
-    } catch {
-      toast.error("Erro ao excluir transação");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro ao excluir transação";
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -386,7 +418,7 @@ export function TransactionForm({
               onChange={(e) => {
                 const newType = e.target.value as RecurrenceType;
                 setRecurrenceType(newType);
-                if (newType !== 'monthly') {
+                if (newType !== "monthly") {
                   setIsInstallment(false);
                 }
               }}
@@ -398,21 +430,65 @@ export function TransactionForm({
               <option value="yearly">Anual</option>
             </Select>
 
-            <Input
-              label="Número de ocorrências"
-              type="text"
-              inputMode="numeric"
-              placeholder="Ex: 12"
-              value={recurrenceOccurrences}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "" || /^\d+$/.test(value)) {
-                  setRecurrenceOccurrences(value);
-                }
-              }}
-            />
+            {/* Toggle de Indeterminado - Esconde se for parcelamento */}
+            {!isInstallment && (
+              <div className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-950 rounded-lg border border-stone-200 dark:border-stone-800">
+                <div>
+                  <p className="font-medium text-stone-900 dark:text-stone-50 text-sm">
+                    Por tempo indeterminado
+                  </p>
+                  <p className="text-xs text-stone-500">
+                    Sem data de término (ex: salário, aluguel)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newValue = !isIndeterminate;
+                    setIsIndeterminate(newValue);
+                    if (newValue) {
+                      setRecurrenceOccurrences("");
+                    } else if (recurrenceOccurrences === "") {
+                      setRecurrenceOccurrences(
+                        String(RECURRENCE_DEFAULTS[recurrenceType])
+                      );
+                    }
+                  }}
+                  className={cn(
+                    "relative w-14 h-8 rounded-full transition-colors",
+                    isIndeterminate
+                      ? "bg-blue-600"
+                      : "bg-stone-300 dark:bg-stone-700"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "absolute top-1 w-6 h-6 rounded-full bg-white transition-transform shadow-md",
+                      isIndeterminate ? "translate-x-7" : "translate-x-1"
+                    )}
+                  />
+                </button>
+              </div>
+            )}
 
-            {recurrenceType === 'monthly' && (
+            {/* Input de ocorrências - Só mostra se NÃO for indeterminado */}
+            {!isIndeterminate && (
+              <Input
+                label="Número de ocorrências"
+                type="text"
+                inputMode="numeric"
+                placeholder="Ex: 12"
+                value={recurrenceOccurrences}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "" || /^\d+$/.test(value)) {
+                    setRecurrenceOccurrences(value);
+                  }
+                }}
+              />
+            )}
+
+            {recurrenceType === "monthly" && !isIndeterminate && (
               <div className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-950 rounded-lg border border-stone-200 dark:border-stone-800">
                 <div>
                   <p className="font-medium text-stone-900 dark:text-stone-50 text-sm">
@@ -427,7 +503,9 @@ export function TransactionForm({
                   onClick={() => setIsInstallment(!isInstallment)}
                   className={cn(
                     "relative w-14 h-8 rounded-full transition-colors",
-                    isInstallment ? "bg-blue-600" : "bg-stone-300 dark:bg-stone-700"
+                    isInstallment
+                      ? "bg-blue-600"
+                      : "bg-stone-300 dark:bg-stone-700"
                   )}
                 >
                   <div

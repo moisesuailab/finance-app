@@ -75,7 +75,7 @@ export function AccountForm({ isOpen, onClose, accountId }: AccountFormProps) {
 
     setIsLoading(true);
     try {
-      if (isEditing && accountId) {
+      if (isEditing && accountId && excludeFromTotal) {
         // Calcular a diferença no saldo inicial
         const oldInitialBalance = account?.initialBalance || 0;
         const difference = numBalance - oldInitialBalance;
@@ -129,6 +129,75 @@ export function AccountForm({ isOpen, onClose, accountId }: AccountFormProps) {
       return;
     }
 
+    // ✨ VALIDAÇÃO 1: Recorrências que AINDA VÃO GERAR transações futuras
+    const activeRecurrences = transactions.filter((t) => {
+      const belongsToAccount =
+        t.accountId === accountId ||
+        t.fromAccountId === accountId ||
+        t.toAccountId === accountId;
+
+      if (!belongsToAccount || !t.isRecurring || t.recurrenceType === "none") {
+        return false;
+      }
+
+      // Recorrência sem limite (indeterminada) sempre bloqueia
+      if (!t.recurrenceOccurrences) {
+        return true;
+      }
+
+      // Verificar se ainda vai gerar mais ocorrências
+      const generatedCount = t.generatedDates?.length || 0;
+      return generatedCount < t.recurrenceOccurrences;
+    });
+
+    // ✨ VALIDAÇÃO 2: Transações PENDENTES
+    const pendingTransactions = transactions.filter(
+      (t) =>
+        (t.accountId === accountId ||
+          t.fromAccountId === accountId ||
+          t.toAccountId === accountId) &&
+        t.status === "pending"
+    );
+
+    // ✨ VALIDAÇÃO 3: Transações FUTURAS (data > hoje)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const futureTransactions = transactions.filter((t) => {
+      const belongsToAccount =
+        t.accountId === accountId ||
+        t.fromAccountId === accountId ||
+        t.toAccountId === accountId;
+
+      if (!belongsToAccount) return false;
+
+      const transactionDate = new Date(t.date);
+      transactionDate.setHours(0, 0, 0, 0);
+
+      return transactionDate > today;
+    });
+
+    if (activeRecurrences.length > 0) {
+      toast.error(
+        `Não é possível arquivar. Há ${activeRecurrences.length} recorrência(s) que ainda vão gerar transações futuras. Desative ou exclua as recorrências primeiro.`
+      );
+      return;
+    }
+
+    if (pendingTransactions.length > 0) {
+      toast.error(
+        `Não é possível arquivar. Há ${pendingTransactions.length} transação(ões) pendente(s). Marque como paga ou exclua primeiro.`
+      );
+      return;
+    }
+
+    if (futureTransactions.length > 0) {
+      toast.error(
+        `Não é possível arquivar. Há ${futureTransactions.length} transação(ões) cadastrada(s) para datas futuras. Exclua ou altere a data primeiro.`
+      );
+      return;
+    }
+
     setIsLoading(true);
     try {
       await updateAccount(accountId, {
@@ -171,18 +240,87 @@ export function AccountForm({ isOpen, onClose, accountId }: AccountFormProps) {
       return;
     }
 
-    // Validar zero transações
-    if (transactionCount > 0) {
+    // ✨ VALIDAÇÃO 1: Recorrências que AINDA VÃO GERAR transações futuras
+    const activeRecurrences = transactions.filter((t) => {
+      const belongsToAccount =
+        t.accountId === accountId ||
+        t.fromAccountId === accountId ||
+        t.toAccountId === accountId;
+
+      if (!belongsToAccount || !t.isRecurring || t.recurrenceType === "none") {
+        return false;
+      }
+
+      // Recorrência sem limite (indeterminada) sempre bloqueia
+      if (!t.recurrenceOccurrences) {
+        return true;
+      }
+
+      // Verificar se ainda vai gerar mais ocorrências
+      const generatedCount = t.generatedDates?.length || 0;
+      return generatedCount < t.recurrenceOccurrences;
+    });
+
+    // ✨ VALIDAÇÃO 2: Transações PENDENTES
+    const pendingTransactions = transactions.filter(
+      (t) =>
+        (t.accountId === accountId ||
+          t.fromAccountId === accountId ||
+          t.toAccountId === accountId) &&
+        t.status === "pending"
+    );
+
+    // ✨ VALIDAÇÃO 3: Transações FUTURAS (data > hoje)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Zerar horas para comparação correta
+
+    const futureTransactions = transactions.filter((t) => {
+      const belongsToAccount =
+        t.accountId === accountId ||
+        t.fromAccountId === accountId ||
+        t.toAccountId === accountId;
+
+      if (!belongsToAccount) return false;
+
+      const transactionDate = new Date(t.date);
+      transactionDate.setHours(0, 0, 0, 0);
+
+      return transactionDate > today;
+    });
+
+    if (activeRecurrences.length > 0) {
       toast.error(
-        `Esta conta possui ${transactionCount} transação(ões). Delete ou transfira todas as transações primeiro.`
+        `Não é possível excluir. Há ${activeRecurrences.length} recorrência(s) que ainda vão gerar transações futuras.`
+      );
+      return;
+    }
+
+    if (pendingTransactions.length > 0) {
+      toast.error(
+        `Não é possível excluir. Há ${pendingTransactions.length} transação(ões) pendente(s). Marque como paga ou exclua primeiro.`
+      );
+      return;
+    }
+
+    if (futureTransactions.length > 0) {
+      toast.error(
+        `Não é possível excluir. Há ${futureTransactions.length} transação(ões) cadastrada(s) para datas futuras. Exclua ou altere a data primeiro.`
       );
       return;
     }
 
     setIsLoading(true);
     try {
+      // Se chegou aqui: pode excluir (será soft-delete se tiver histórico, hard-delete se não)
       await deleteAccount(accountId);
-      toast.success("Conta excluída permanentemente!");
+
+      // Mensagem diferenciada
+      if (transactionCount > 0) {
+        toast.success("Conta ocultada com sucesso! (mantida no histórico)");
+      } else {
+        toast.success("Conta excluída permanentemente!");
+      }
+
       onClose();
     } catch {
       toast.error("Erro ao excluir conta");
@@ -310,8 +448,8 @@ export function AccountForm({ isOpen, onClose, accountId }: AccountFormProps) {
               )
             )}
 
-            {/* Excluir - APENAS se saldo zero E sem transações */}
-            {account.currentBalance === 0 && transactionCount === 0 && (
+            {/* Excluir - Sempre mostrar se saldo zero */}
+            {account.currentBalance === 0 && (
               <button
                 type="button"
                 onClick={handleDelete}
@@ -319,8 +457,17 @@ export function AccountForm({ isOpen, onClose, accountId }: AccountFormProps) {
                 className="w-full py-3 px-4 bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 rounded-xl font-medium hover:bg-red-200 dark:hover:bg-red-900 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 <Trash2 className="w-5 h-5" />
-                Excluir
+                {transactionCount === 0
+                  ? "Excluir Permanentemente"
+                  : "Excluir (Ocultar)"}
               </button>
+            )}
+
+            {/* Aviso se saldo não-zero */}
+            {account.currentBalance !== 0 && (
+              <div className="p-3 bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 rounded-lg text-sm">
+                💡 Zere o saldo para poder arquivar ou excluir esta conta
+              </div>
             )}
           </div>
         )}

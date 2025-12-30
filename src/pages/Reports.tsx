@@ -24,10 +24,13 @@ import {
 import { format, subMonths, startOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ExportModal } from "@/components/modals/ExportModal";
+import { cn } from "@/lib/utils";
+import { calculateRecurringProjections } from "@/lib/projections";
 
 export function Reports() {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [showExport, setShowExport] = useState(false);
+  const [projectionPeriod, setProjectionPeriod] = useState(36);
 
   const transactions = useTransactionStore((state) => state.transactions);
   const categories = useCategoryStore((state) => state.categories);
@@ -62,6 +65,70 @@ export function Reports() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 8); // Top 8 categorias
   }, [transactions, categories, selectedMonth]);
+
+  // Projeção de longo prazo
+  const yearlyProjections = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const years: { year: number; balance: number }[] = [];
+    const currentYear = today.getFullYear();
+    const yearsToProject = Math.ceil(projectionPeriod / 12);
+
+    for (let yearOffset = 0; yearOffset < yearsToProject; yearOffset++) {
+      const year = currentYear + yearOffset;
+      const yearStart = new Date(year, 0, 1); // 1º de janeiro
+      const yearEnd = new Date(year, 11, 31); // 31 de dezembro
+
+      // Ajustar para começar do mês atual no primeiro ano
+      const startDate = yearOffset === 0 ? today : yearStart;
+
+      // Transações futuras JÁ cadastradas neste ano
+      const futureInYear = transactions.filter((t) => {
+        const date = new Date(t.date);
+        date.setHours(0, 0, 0, 0);
+        return date >= startDate && date <= yearEnd && !t.isRecurring;
+      });
+
+      const income = futureInYear
+        .filter((t) => t.type === "income")
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const expenses = futureInYear
+        .filter((t) => t.type === "expense")
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      // Recorrências determinadas neste ano
+      const recurringProjections = calculateRecurringProjections(
+        transactions,
+        startDate,
+        yearEnd
+      );
+
+      const totalIncome = income + recurringProjections.projectedIncome;
+      const totalExpenses = expenses + recurringProjections.projectedExpenses;
+      const balance = totalIncome - totalExpenses;
+
+      years.push({ year, balance });
+    }
+
+    return years;
+  }, [transactions, projectionPeriod]);
+
+  // Valor máximo para cálculo das barras de progresso
+  const maxProjectionValue = useMemo(() => {
+    const maxPositive = Math.max(
+      ...yearlyProjections.filter((y) => y.balance > 0).map((y) => y.balance),
+      0
+    );
+    const maxNegative = Math.abs(
+      Math.min(
+        ...yearlyProjections.filter((y) => y.balance < 0).map((y) => y.balance),
+        0
+      )
+    );
+    return Math.max(maxPositive, maxNegative, 1); // Evitar divisão por zero
+  }, [yearlyProjections]);
 
   // Evolução dos últimos 6 meses
   const monthlyEvolution = useMemo(() => {
@@ -188,7 +255,7 @@ export function Reports() {
           </CardHeader>
           <CardContent className="p-4 pt-2">
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={256}>
                 <LineChart
                   data={monthlyEvolution}
                   margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
@@ -260,7 +327,7 @@ export function Reports() {
             </CardHeader>
             <CardContent className="p-4 pt-2">
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={256}>
                   <RechartsPie>
                     <Pie
                       data={expensesByCategory}
@@ -377,6 +444,80 @@ export function Reports() {
             </CardContent>
           </Card>
         )}
+
+        {/* Projeção de Longo Prazo */}
+        <Card>
+          <CardHeader className="pb-2">
+            <h3 className="font-semibold text-stone-900 dark:text-stone-50 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Projeção Futura
+            </h3>
+          </CardHeader>
+          <CardContent className="p-4 pt-2">
+            {/* Seletor de Período */}
+            <div className="flex gap-2 mb-4">
+              {[24, 36, 48, 60].map((months) => (
+                <button
+                  key={months}
+                  onClick={() => setProjectionPeriod(months)}
+                  className={cn(
+                    "flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all active:scale-95",
+                    projectionPeriod === months
+                      ? "bg-stone-900 dark:bg-stone-50 text-white dark:text-stone-900 shadow-md"
+                      : "bg-stone-100 dark:bg-stone-900 text-stone-600 dark:text-stone-400"
+                  )}
+                >
+                  {months}m
+                </button>
+              ))}
+            </div>
+
+            {/* Projeção por Ano */}
+            <div className="space-y-3">
+              {yearlyProjections.map((year) => (
+                <div key={year.year} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-stone-700 dark:text-stone-300">
+                      {year.year}
+                    </span>
+                    <span
+                      className={cn(
+                        "font-bold",
+                        year.balance >= 0
+                          ? "text-green-600 dark:text-green-500"
+                          : "text-red-600 dark:text-red-500"
+                      )}
+                    >
+                      {year.balance >= 0 ? "+" : ""}
+                      {formatCurrency(year.balance)}
+                    </span>
+                  </div>
+                  {/* Barra de Progresso */}
+                  <div className="h-2 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full transition-all rounded-full",
+                        year.balance >= 0 ? "bg-green-500" : "bg-red-500"
+                      )}
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          Math.abs(year.balance / maxProjectionValue) * 100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Info sobre o cálculo */}
+            <p className="text-xs text-stone-500 mt-4 text-center">
+              Baseado em recorrências determinadas (parcelamentos, contratos
+              fixos)
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Modal de Exportação */}

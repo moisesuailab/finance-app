@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from 'react-router-dom'
 import {
   Moon,
   Sun,
@@ -7,6 +8,7 @@ import {
   Upload,
   Database,
   Wallet,
+  Repeat,
 } from "lucide-react";
 import { MobileLayout } from "@/components/layout/MobileLayout";
 import { Header } from "@/components/layout/Header";
@@ -16,6 +18,7 @@ import { db } from "@/lib/db";
 import { toast } from "react-toastify";
 
 export function Settings() {
+  const navigate = useNavigate()
   const [darkMode, setDarkMode] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -189,7 +192,7 @@ export function Settings() {
                 <button
                   onClick={toggleDarkMode}
                   className={`relative w-14 h-8 rounded-full transition-colors ${
-                    darkMode ? "bg-stone-700" : "bg-stone-300"
+                    darkMode ? "bg-blue-600" : "bg-stone-300"
                   }`}
                 >
                   <div
@@ -297,6 +300,31 @@ export function Settings() {
               </button>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Recorrências */}
+        <div>
+        <h2 className="text-sm font-semibold text-stone-500 dark:text-stone-400 mb-3 px-2">
+            FINANCEIRO
+        </h2>
+        <Card>
+            <CardContent className="p-4">
+                <button
+                    onClick={() => navigate('/settings/recurrence')}
+                    className="w-full flex items-center gap-3 text-left"
+                >
+                    <Repeat className="w-5 h-5 text-stone-700 dark:text-stone-300" />
+                    <div>
+                    <p className="font-medium text-stone-900 dark:text-stone-50">
+                        Gerenciar Recorrências
+                    </p>
+                    <p className="text-sm text-stone-500">
+                        Visualizar e controlar transações recorrentes
+                    </p>
+                    </div>
+                </button>
+                </CardContent>
+            </Card>
         </div>
 
         {/* Informações */}

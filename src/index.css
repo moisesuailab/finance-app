@@ -68,3 +68,13 @@
   -moz-user-select: none;
   -ms-user-select: none;
 }
+
+/* Ocultar scrollbar em filtros horizontais */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

@@ -28,10 +28,12 @@ import type { Transaction } from "@/types/finance";
 import { TransactionForm } from "@/components/forms/TransactionForm";
 import { TransferModal } from "@/components/modals/TransferModal";
 import { TransferViewModal } from "@/components/modals/TransferViewModal";
+import { calculateRecurringProjections } from "@/lib/projections";
 
 export function Home() {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set(['all']));
   const [editingTransaction, setEditingTransaction] = useState<number | null>(
     null
   );
@@ -39,7 +41,9 @@ export function Home() {
     "income" | "expense"
   >("income");
   const [showTransfer, setShowTransfer] = useState(false);
-  const [viewingTransfer, setViewingTransfer] = useState<Transaction | null>(null);
+  const [viewingTransfer, setViewingTransfer] = useState<Transaction | null>(
+    null
+  );
   const [searchTerm, setSearchTerm] = useState("");
 
   const accounts = useAccountStore((state) => state.accounts);
@@ -57,48 +61,140 @@ export function Home() {
   }, [selectedMonth]);
 
   const stats = useMemo(() => {
-    const monthTransactions = transactions.filter((t) =>
-      isInMonthRange(new Date(t.date), selectedMonth)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const monthTransactions = transactions.filter((t) =>
+    isInMonthRange(new Date(t.date), selectedMonth)
+  );
+
+  // Transações até hoje (já realizadas)
+  const pastTransactions = monthTransactions.filter((t) => {
+    const date = new Date(t.date);
+    date.setHours(0, 0, 0, 0);
+    return date <= today && t.status === 'completed';
+  });
+
+  // Transações futuras (projeção) - JÁ CADASTRADAS
+  const futureTransactions = monthTransactions.filter((t) => {
+    const date = new Date(t.date);
+    date.setHours(0, 0, 0, 0);
+    return date > today || t.status === 'pending';
+  });
+
+  const income = pastTransactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const expenses = pastTransactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  // ✨ NOVO: Incluir recorrências determinadas no cálculo
+  const startOfMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
+  const endOfMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
+  
+  const recurringProjections = calculateRecurringProjections(
+    transactions,
+    today > startOfMonth ? today : startOfMonth, // Do hoje até fim do mês
+    endOfMonth
+  );
+
+  const futureIncome = futureTransactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + t.amount, 0) + recurringProjections.projectedIncome;
+
+  const futureExpenses = futureTransactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => sum + t.amount, 0) + recurringProjections.projectedExpenses;
+
+  // Calcular os três saldos
+  const availableBalance = accounts
+    .filter((a) => !a.isArchived && !a.excludeFromTotal)
+    .reduce((sum, acc) => sum + acc.currentBalance, 0);
+
+  const reservedBalance = accounts
+    .filter((a) => !a.isArchived && a.excludeFromTotal)
+    .reduce((sum, acc) => sum + acc.currentBalance, 0);
+
+  const totalBalance = availableBalance + reservedBalance;
+  const monthBalance = income - expenses;
+
+  // ✨ NOVO: Projeção 12 meses com recorrências determinadas
+  let next12MonthsProjection = 0;
+  if (isCurrentMonth) {
+    const startOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const next12Months = new Date(today);
+    next12Months.setMonth(next12Months.getMonth() + 12);
+    
+    // Transações futuras JÁ cadastradas
+    const futureTransactionsNext12 = transactions.filter((t) => {
+      const date = new Date(t.date);
+      date.setHours(0, 0, 0, 0);
+      return date >= startOfNextMonth && date <= next12Months;
+    });
+    
+    const projectedIncome = futureTransactionsNext12
+      .filter((t) => t.type === "income")
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    const projectedExpenses = futureTransactionsNext12
+      .filter((t) => t.type === "expense")
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    // ✨ Adicionar recorrências determinadas
+    const recurringNext12 = calculateRecurringProjections(
+      transactions,
+      startOfNextMonth,
+      next12Months
     );
+    
+    next12MonthsProjection = 
+      (projectedIncome + recurringNext12.projectedIncome) - 
+      (projectedExpenses + recurringNext12.projectedExpenses);
+  }
 
-    const income = monthTransactions
-      .filter((t) => t.type === "income" && t.status === "completed")
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const expenses = monthTransactions
-      .filter((t) => t.type === "expense" && t.status === "completed")
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    // Calcular os três saldos
-    const availableBalance = accounts
-      .filter((a) => !a.isArchived && !a.excludeFromTotal)
-      .reduce((sum, acc) => sum + acc.currentBalance, 0);
-
-    const reservedBalance = accounts
-      .filter((a) => !a.isArchived && a.excludeFromTotal)
-      .reduce((sum, acc) => sum + acc.currentBalance, 0);
-
-    const totalBalance = availableBalance + reservedBalance;
-
-    const monthBalance = income - expenses;
-
-    return { income, expenses, availableBalance, reservedBalance, totalBalance, monthBalance };
-  }, [transactions, accounts, selectedMonth]);
+  return { 
+    income, 
+    expenses, 
+    availableBalance, 
+    reservedBalance, 
+    totalBalance, 
+    monthBalance,
+    futureIncome,
+    futureExpenses,
+    next12MonthsProjection
+  };
+}, [transactions, accounts, selectedMonth, isCurrentMonth]);
 
   const filteredTransactions = useMemo(() => {
     return [...transactions]
-      .filter((t) => isInMonthRange(new Date(t.date), selectedMonth))
-      .filter((t) =>
+        .filter((t) => isInMonthRange(new Date(t.date), selectedMonth))
+        .filter((t) =>
         t.description.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      .sort((a, b) => {
-        // Pendentes primeiro
-        if (a.status === "pending" && b.status !== "pending") return -1;
-        if (a.status !== "pending" && b.status === "pending") return 1;
-        // Depois por data
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      });
-  }, [transactions, selectedMonth, searchTerm]);
+        )
+        .filter((t) => {
+        // Se "Todos" está ativo, não filtra por tipo/status
+        if (activeFilters.has('all')) return true;
+        
+        // Filtros de tipo
+        const matchesType = 
+            (activeFilters.has('income') && t.type === 'income') ||
+            (activeFilters.has('expense') && t.type === 'expense') ||
+            (!activeFilters.has('income') && !activeFilters.has('expense'));
+        
+        // Filtro de status
+        const matchesStatus = 
+            (activeFilters.has('pending') && t.status === 'pending') ||
+            (!activeFilters.has('pending'));
+        
+        return matchesType && matchesStatus;
+        })
+        .sort((a, b) => {
+          // Ordem cronológica inversa (mais recente primeiro)
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
+    }, [transactions, selectedMonth, searchTerm, activeFilters]);
 
   const getCategoryName = (categoryId: number) => {
     return categories.find((c) => c.id === categoryId)?.name || "Sem categoria";
@@ -109,15 +205,15 @@ export function Home() {
   };
 
   const handleEdit = (transactionId: number) => {
-    const transaction = transactions.find(t => t.id === transactionId)
-    
-    if (transaction?.type === 'transfer') {
+    const transaction = transactions.find((t) => t.id === transactionId);
+
+    if (transaction?.type === "transfer") {
       // Abrir modal de visualização read-only
-      setViewingTransfer(transaction)
+      setViewingTransfer(transaction);
     } else {
       // Abrir formulário de edição normal
-      setEditingTransaction(transactionId)
-      setShowForm(true)
+      setEditingTransaction(transactionId);
+      setShowForm(true);
     }
   };
 
@@ -130,6 +226,34 @@ export function Home() {
     setInitialTransactionType(type);
     setEditingTransaction(null);
     setShowForm(true);
+  };
+  
+  const handleFilterToggle = (filter: string) => {
+    setActiveFilters(prev => {
+        const newFilters = new Set(prev);
+        
+        // Se clicar em "Todos"
+        if (filter === 'all') {
+        return new Set(['all']);
+        }
+        
+        // Remove "Todos" se clicar em qualquer outro
+        newFilters.delete('all');
+        
+        // Toggle do filtro clicado
+        if (newFilters.has(filter)) {
+        newFilters.delete(filter);
+        } else {
+        newFilters.add(filter);
+        }
+        
+        // Se nenhum filtro, volta para "Todos"
+        if (newFilters.size === 0) {
+        return new Set(['all']);
+        }
+        
+        return newFilters;
+    });
   };
 
   return (
@@ -181,26 +305,77 @@ export function Home() {
           <CardContent className="p-6">
             <div className="flex items-center gap-2 text-stone-400 mb-2">
               <Wallet className="w-4 h-4" />
-              <span className="text-sm">Saldo Disponível</span>
+              <span className="text-sm">Saldo Disponível hoje</span>
             </div>
             <BlurValue isVisible={isVisible}>
-              <p className={`text-3xl sm:text-4xl font-bold ${
-                stats.availableBalance >= 0 ? 'text-white' : 'text-red-400'
-              }`}>
+              <p
+                className={`text-3xl sm:text-4xl font-bold ${
+                  stats.availableBalance >= 0 ? "text-white" : "text-red-400"
+                }`}
+              >
                 <CompactCurrency value={stats.availableBalance} />
               </p>
             </BlurValue>
+
+            {/* Balanço do Mês */}
             <div className="mt-3 pt-3 border-t border-stone-700">
-              <p className="text-sm text-stone-400">Balanço do Mês</p>
+              <p className="text-sm text-stone-400">Resultado do Mês</p>
               <BlurValue isVisible={isVisible}>
-                <p className={`text-xl font-bold ${
-                  stats.monthBalance >= 0 ? "text-green-400" : "text-red-400"
-                }`}>
+                <p
+                  className={`text-xl font-bold ${
+                    stats.monthBalance >= 0 ? "text-green-400" : "text-red-400"
+                  }`}
+                >
                   {stats.monthBalance >= 0 ? "+" : ""}
                   <CompactCurrency value={stats.monthBalance} />
                 </p>
               </BlurValue>
+
+              {/* Projeções Futuras do Mês - Só mostra se houver */}
+              {(stats.futureIncome > 0 || stats.futureExpenses > 0) && (
+                <div className="mt-2 flex gap-4 text-xs">
+                  {stats.futureIncome > 0 && (
+                    <BlurValue isVisible={isVisible}>
+                      <span className="text-green-400/80">
+                        A receber:{" "}
+                        <CompactCurrency value={stats.futureIncome} />
+                      </span>
+                    </BlurValue>
+                  )}
+                  {stats.futureExpenses > 0 && (
+                    <BlurValue isVisible={isVisible}>
+                      <span className="text-red-400/80">
+                        A pagar:{" "}
+                        <CompactCurrency value={stats.futureExpenses} />
+                      </span>
+                    </BlurValue>
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* Projeção 12 Meses - Só no mês atual e se != 0 */}
+            {isCurrentMonth && stats.next12MonthsProjection !== 0 && (
+              <div className="mt-3 pt-3 border-t border-stone-700/50">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-stone-400">
+                    Próximos 12 meses
+                  </span>
+                  <BlurValue isVisible={isVisible}>
+                    <span
+                      className={`text-sm font-semibold ${
+                        stats.next12MonthsProjection >= 0
+                          ? "text-green-400/90"
+                          : "text-red-400/90"
+                      }`}
+                    >
+                      {stats.next12MonthsProjection >= 0 ? "+" : ""}
+                      <CompactCurrency value={stats.next12MonthsProjection} />
+                    </span>
+                  </BlurValue>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -215,7 +390,7 @@ export function Home() {
                 <div className="p-1.5 bg-green-100 dark:bg-green-950 rounded-lg">
                   <ArrowUpRight className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-medium">Receitas</span>
+                <span className="text-xs font-medium">Entradas</span>
               </div>
               <BlurValue isVisible={isVisible}>
                 <p className="text-lg sm:text-xl font-bold text-stone-900 dark:text-stone-50">
@@ -234,7 +409,7 @@ export function Home() {
                 <div className="p-1.5 bg-red-100 dark:bg-red-950 rounded-lg">
                   <ArrowDownRight className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-medium">Despesas</span>
+                <span className="text-xs font-medium">Saídas</span>
               </div>
               <BlurValue isVisible={isVisible}>
                 <p className="text-lg sm:text-xl font-bold text-stone-900 dark:text-stone-50">
@@ -249,18 +424,73 @@ export function Home() {
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
           <Input
-            placeholder="Buscar transações..."
+            placeholder="Buscar movimentações..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-12"
           />
         </div>
 
+        {/* Filtros por Tags */}
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          <button
+            onClick={() => handleFilterToggle('all')}
+            className={`
+                px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
+                ${activeFilters.has('all')
+                ? 'bg-stone-900 dark:bg-stone-50 text-white dark:text-stone-900 border-2 border-stone-900 dark:border-stone-50'
+                : 'bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-2 border-transparent hover:bg-stone-300 dark:hover:bg-stone-700'
+                }
+            `}
+            >
+            Todas
+          </button>
+          
+          <button
+            onClick={() => handleFilterToggle('pending')}
+            className={`
+                px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
+                ${activeFilters.has('pending')
+                ? 'bg-stone-900 dark:bg-stone-50 text-white dark:text-stone-900 border-2 border-stone-900 dark:border-stone-50'
+                : 'bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-2 border-transparent hover:bg-stone-300 dark:hover:bg-stone-700'
+                }
+            `}
+            >
+            Pendentes
+          </button>
+          
+          <button
+            onClick={() => handleFilterToggle('income')}
+            className={`
+                px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
+                ${activeFilters.has('income')
+                ? 'bg-stone-900 dark:bg-stone-50 text-white dark:text-stone-900 border-2 border-stone-900 dark:border-stone-50'
+                : 'bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-2 border-transparent hover:bg-stone-300 dark:hover:bg-stone-700'
+                }
+            `}
+            >
+            Entradas
+          </button>
+          
+          <button
+            onClick={() => handleFilterToggle('expense')}
+            className={`
+                px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
+                ${activeFilters.has('expense')
+                ? 'bg-stone-900 dark:bg-stone-50 text-white dark:text-stone-900 border-2 border-stone-900 dark:border-stone-50'
+                : 'bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-2 border-transparent hover:bg-stone-300 dark:hover:bg-stone-700'
+                }
+            `}
+            >
+            Saídas
+          </button>
+        </div>
+
         {/* Transações */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-stone-900 dark:text-stone-50">
-              Transações
+              Movimentações
             </h2>
           </div>
 
@@ -269,8 +499,8 @@ export function Home() {
               <CardContent className="p-8 text-center">
                 <p className="text-stone-500">
                   {searchTerm
-                    ? "Nenhuma transação encontrada"
-                    : "Nenhuma transação neste mês"}
+                    ? "Nenhuma movimentação encontrada"
+                    : "Nenhuma movimentação neste mês"}
                 </p>
               </CardContent>
             </Card>
@@ -278,9 +508,13 @@ export function Home() {
             <div className="space-y-2">
               {filteredTransactions.map((transaction) => {
                 // Verificar se é transferência
-                const isTransfer = transaction.type === 'transfer'
-                const fromAccount = isTransfer ? accounts.find(a => a.id === transaction.fromAccountId) : null
-                const toAccount = isTransfer ? accounts.find(a => a.id === transaction.toAccountId) : null
+                const isTransfer = transaction.type === "transfer";
+                const fromAccount = isTransfer
+                  ? accounts.find((a) => a.id === transaction.fromAccountId)
+                  : null;
+                const toAccount = isTransfer
+                  ? accounts.find((a) => a.id === transaction.toAccountId)
+                  : null;
 
                 return (
                   <Card
@@ -310,17 +544,17 @@ export function Home() {
 
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-stone-900 dark:text-stone-50 truncate">
-                            {isTransfer ? (
-                              // Para transferências, mostrar só o fluxo no título
-                              `${fromAccount?.name || 'Conta removida'} → ${toAccount?.name || 'Conta removida'}`
-                            ) : (
-                              transaction.description
-                            )}
+                            {isTransfer
+                              ? // Para transferências, mostrar só o fluxo no título
+                                `${fromAccount?.name || "Conta removida"} → ${
+                                  toAccount?.name || "Conta removida"
+                                }`
+                              : transaction.description}
                           </p>
                           <p className="text-sm text-stone-500 mt-1">
                             {isTransfer ? (
                               // Para transferências, não mostrar descrição duplicada
-                              'Transferência'
+                              "Transferência"
                             ) : (
                               <>
                                 {getCategoryName(transaction.categoryId)} •{" "}
@@ -344,8 +578,13 @@ export function Home() {
                                   : "text-red-600 dark:text-red-500"
                               }`}
                             >
-                              {!isTransfer && transaction.type === "income" ? "+" : ""}
-                              <CompactCurrency value={transaction.amount} disableTap />
+                              {!isTransfer && transaction.type === "income"
+                                ? "+"
+                                : ""}
+                              <CompactCurrency
+                                value={transaction.amount}
+                                disableTap
+                              />
                             </p>
                           </BlurValue>
                           {transaction.status === "pending" && (
@@ -358,7 +597,7 @@ export function Home() {
                       </div>
                     </CardContent>
                   </Card>
-                )
+                );
               })}
             </div>
           )}
@@ -367,7 +606,7 @@ export function Home() {
           {filteredTransactions.length > 0 && (
             <p className="text-center text-sm text-stone-500 mt-3">
               {filteredTransactions.length}{" "}
-              {filteredTransactions.length === 1 ? "transação" : "transações"}
+              {filteredTransactions.length === 1 ? "movimentação" : "movimentações"}
               {searchTerm && " encontrada(s)"}
             </p>
           )}
@@ -375,7 +614,10 @@ export function Home() {
       </div>
 
       {/* Modal de Transferência */}
-      <TransferModal isOpen={showTransfer} onClose={() => setShowTransfer(false)} />
+      <TransferModal
+        isOpen={showTransfer}
+        onClose={() => setShowTransfer(false)}
+      />
 
       {/* Modal de Visualização de Transferência */}
       {viewingTransfer && (
