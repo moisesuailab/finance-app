@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Archive, ArchiveRestore, Trash2, PiggyBank, Wallet } from "lucide-react";
+import { Archive, ArchiveRestore, Trash2, PiggyBank, Wallet, Lightbulb, Plus } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
@@ -63,60 +63,58 @@ export function AccountForm({ isOpen, onClose, accountId }: AccountFormProps) {
 
   const handleSubmit = async () => {
     if (!name || !initialBalance) {
-      toast.error("Preencha todos os campos");
-      return;
+        toast.error("Preencha todos os campos");
+        return;
     }
 
     const numBalance = parseFloat(initialBalance);
     if (numBalance < 0) {
-      toast.error("O saldo não pode ser negativo");
-      return;
+        toast.error("O saldo não pode ser negativo");
+        return;
     }
 
     setIsLoading(true);
     try {
-      if (isEditing && accountId && excludeFromTotal) {
-        // Calcular a diferença no saldo inicial
-        const oldInitialBalance = account?.initialBalance || 0;
-        const difference = numBalance - oldInitialBalance;
-        const newCurrentBalance = (account?.currentBalance || 0) + difference;
+        if (isEditing && accountId) {
+            const oldInitialBalance = account?.initialBalance || 0;
+            const difference = numBalance - oldInitialBalance;
+            const newCurrentBalance = (account?.currentBalance || 0) + difference;
 
-        // VALIDAÇÃO: Não permitir se resultar em saldo negativo
-        if (newCurrentBalance < 0) {
-          toast.error(
-            `O saldo atual ficaria negativo (${formatCurrency(
-              newCurrentBalance
-            )}). Não é possível realizar esta alteração.`
-          );
-          setIsLoading(false);
-          return;
+            if (excludeFromTotal && newCurrentBalance < 0) {
+                toast.error(
+                `O saldo atual ficaria negativo (${formatCurrency(
+                    newCurrentBalance
+                )}). Não é possível realizar esta alteração.`
+                );
+                setIsLoading(false);
+                return;
+            }
+
+            await updateAccount(accountId, {
+                name,
+                description: description.trim() || undefined,
+                color,
+                initialBalance: numBalance,
+                currentBalance: newCurrentBalance,
+                excludeFromTotal,
+            });
+            toast.success("Conta atualizada com sucesso!");
+        } else {
+            await addAccount({
+                name,
+                description: description.trim() || undefined,
+                initialBalance: numBalance,
+                color,
+                icon: "wallet",
+                excludeFromTotal,
+            });
+            toast.success("Conta criada com sucesso!");
         }
-
-        await updateAccount(accountId, {
-          name,
-          description: description.trim() || undefined,
-          color,
-          initialBalance: numBalance,
-          currentBalance: newCurrentBalance,
-          excludeFromTotal,
-        });
-        toast.success("Conta atualizada com sucesso!");
-      } else {
-        await addAccount({
-          name,
-          description: description.trim() || undefined,
-          initialBalance: numBalance,
-          color,
-          icon: "wallet",
-          excludeFromTotal,
-        });
-        toast.success("Conta criada com sucesso!");
-      }
-      onClose();
+        onClose();
     } catch {
-      toast.error("Erro ao salvar conta");
+        toast.error("Erro ao salvar conta");
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   };
 
@@ -366,25 +364,44 @@ export function AccountForm({ isOpen, onClose, accountId }: AccountFormProps) {
         />
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
-            Cor
-          </label>
-          <div className="grid grid-cols-8 gap-2">
-            {PRESET_COLORS.map((presetColor) => (
-              <button
-                key={presetColor}
-                type="button"
-                onClick={() => setColor(presetColor)}
-                className="w-10 h-10 rounded-lg transition-transform active:scale-95"
+            <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
+                Cor
+            </label>
+            <div className="grid grid-cols-8 gap-2">
+                {/* 7 cores pré-definidas */}
+                {PRESET_COLORS.slice(0, 7).map((presetColor) => (
+                <button
+                    key={presetColor}
+                    type="button"
+                    onClick={() => setColor(presetColor)}
+                    className="w-10 h-10 rounded-lg transition-transform active:scale-95"
+                    style={{
+                    backgroundColor: presetColor,
+                    border:
+                        color === presetColor ? "3px solid currentColor" : "none",
+                    opacity: color === presetColor ? 1 : 0.6,
+                    }}
+                />
+                ))}
+                
+                {/* 8ª posição: Color Picker */}
+                <label
+                className="w-10 h-10 rounded-lg border-2 border-stone-300 dark:border-stone-700 flex items-center justify-center cursor-pointer hover:border-stone-400 dark:hover:border-stone-600 transition-all active:scale-95"
                 style={{
-                  backgroundColor: presetColor,
-                  border:
-                    color === presetColor ? "3px solid currentColor" : "none",
-                  opacity: color === presetColor ? 1 : 0.6,
+                    backgroundColor: !PRESET_COLORS.slice(0, 7).includes(color) ? color : 'transparent',
+                    borderColor: !PRESET_COLORS.slice(0, 7).includes(color) ? color : undefined,
+                    borderWidth: !PRESET_COLORS.slice(0, 7).includes(color) ? '3px' : '2px'
                 }}
-              />
-            ))}
-          </div>
+                >
+                <Plus className="w-5 h-5 text-stone-500 dark:text-stone-400" />
+                <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="absolute opacity-0 w-0 h-0"
+                />
+                </label>
+            </div>
         </div>
 
         {/* Toggle de Reserva */}
@@ -488,8 +505,9 @@ export function AccountForm({ isOpen, onClose, accountId }: AccountFormProps) {
 
             {/* Aviso se saldo não-zero */}
             {account.currentBalance !== 0 && (
-              <div className="p-3 bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 rounded-lg text-sm">
-                💡 Zere o saldo para poder arquivar ou excluir esta conta
+              <div className="p-3 bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 rounded-lg text-sm flex items-start gap-2">
+                <Lightbulb className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>Zere o saldo para poder arquivar ou excluir esta conta</span>
               </div>
             )}
           </div>
