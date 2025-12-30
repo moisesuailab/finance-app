@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Archive, ArchiveRestore, Trash2, PiggyBank } from "lucide-react";
+import { Archive, ArchiveRestore, Trash2, PiggyBank, Wallet } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { CurrencyInput } from "@/components/ui/CurrencyInput";
@@ -388,36 +388,59 @@ export function AccountForm({ isOpen, onClose, accountId }: AccountFormProps) {
         </div>
 
         {/* Toggle de Reserva */}
+        {!isEditing && (
         <div className="flex items-center justify-between p-4 bg-stone-100 dark:bg-stone-900 rounded-xl">
-          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
             <PiggyBank className="w-5 h-5 text-stone-600 dark:text-stone-400" />
             <div>
-              <p className="font-medium text-stone-900 dark:text-stone-50">
+                <p className="font-medium text-stone-900 dark:text-stone-50">
                 É uma reserva?
-              </p>
-              <p className="text-sm text-stone-500">
+                </p>
+                <p className="text-sm text-stone-500">
                 Saldo não conta no "Disponível"
-              </p>
+                </p>
             </div>
-          </div>
-          <button
+            </div>
+            <button
             type="button"
             onClick={() => setExcludeFromTotal(!excludeFromTotal)}
             className={cn(
-              "relative w-14 h-8 rounded-full transition-colors",
-              excludeFromTotal
+                "relative w-14 h-8 rounded-full transition-colors",
+                excludeFromTotal
                 ? "bg-blue-600"
                 : "bg-stone-300 dark:bg-stone-700"
             )}
-          >
+            >
             <div
-              className={cn(
+                className={cn(
                 "absolute top-1 w-6 h-6 rounded-full bg-white transition-transform shadow-md",
                 excludeFromTotal ? "translate-x-7" : "translate-x-1"
-              )}
+                )}
             />
-          </button>
+            </button>
         </div>
+        )}
+
+        {/* Badge informativo na edição */}
+        {isEditing && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-xl border border-blue-200 dark:border-blue-900">
+                <div className="flex items-center gap-3">
+                {account?.excludeFromTotal ? (
+                    <PiggyBank className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                ) : (
+                    <Wallet className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                )}
+                <div>
+                    <p className="font-medium text-blue-900 dark:text-blue-100 text-sm">
+                    Tipo: {account?.excludeFromTotal ? 'Reserva' : 'Pagamento'}
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
+                    O tipo não pode ser alterado após a criação
+                    </p>
+                </div>
+                </div>
+            </div>
+        )}
 
         {/* Botões de Ação (se editando) */}
         {isEditing && account && (
