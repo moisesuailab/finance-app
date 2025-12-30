@@ -5,6 +5,7 @@ import { useCategoryStore } from '@/stores/useCategoryStore'
 import { toast } from 'react-toastify'
 import { cn } from '@/lib/utils'
 import type { TransactionType } from '@/types/finance'
+import { Plus } from 'lucide-react'
 
 interface CategoryFormProps {
   isOpen: boolean
@@ -157,24 +158,43 @@ export function CategoryForm({ isOpen, onClose, categoryId }: CategoryFormProps)
         />
 
         <div className="space-y-2">
-          <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
-            Cor
-          </label>
-          <div className="grid grid-cols-6 gap-2">
-            {PRESET_COLORS.map((presetColor) => (
-              <button
-                key={presetColor}
-                type="button"
-                onClick={() => setColor(presetColor)}
-                className="w-full aspect-square rounded-lg transition-transform active:scale-95"
+            <label className="text-sm font-medium text-stone-700 dark:text-stone-300">
+                Cor
+            </label>
+            <div className="grid grid-cols-6 gap-2">
+                {/* 11 cores pré-definidas */}
+                {PRESET_COLORS.slice(0, 11).map((presetColor) => (
+                <button
+                    key={presetColor}
+                    type="button"
+                    onClick={() => setColor(presetColor)}
+                    className="w-full aspect-square rounded-lg transition-transform active:scale-95"
+                    style={{
+                    backgroundColor: presetColor,
+                    border: color === presetColor ? '3px solid currentColor' : 'none',
+                    opacity: color === presetColor ? 1 : 0.6
+                    }}
+                />
+                ))}
+                
+                {/* 12ª posição: Color Picker */}
+                <label
+                className="w-full aspect-square rounded-lg border-2 border-stone-300 dark:border-stone-700 flex items-center justify-center cursor-pointer hover:border-stone-400 dark:hover:border-stone-600 transition-all active:scale-95"
                 style={{
-                  backgroundColor: presetColor,
-                  border: color === presetColor ? '3px solid currentColor' : 'none',
-                  opacity: color === presetColor ? 1 : 0.6
+                    backgroundColor: !PRESET_COLORS.slice(0, 11).includes(color) ? color : 'transparent',
+                    borderColor: !PRESET_COLORS.slice(0, 11).includes(color) ? color : undefined,
+                    borderWidth: !PRESET_COLORS.slice(0, 11).includes(color) ? '3px' : '2px'
                 }}
-              />
-            ))}
-          </div>
+                >
+                <Plus className="w-5 h-5 text-stone-500 dark:text-stone-400" />
+                <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="absolute opacity-0 w-0 h-0"
+                />
+                </label>
+            </div>
         </div>
 
         {isEditing && (
