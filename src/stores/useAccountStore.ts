@@ -52,13 +52,23 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
   updateAccount: async (id, accountData) => {
     set({ isLoading: true, error: null })
     try {
-      await db.accounts.update(id, {
+        const account = await db.accounts.get(id)
+        
+        if (account && accountData.excludeFromTotal !== undefined) {
+        if (account.excludeFromTotal !== accountData.excludeFromTotal) {
+            set({ isLoading: false })
+            throw new Error('O tipo de conta (Pagamento/Reserva) não pode ser alterado após a criação')
+        }
+        }
+        
+        await db.accounts.update(id, {
         ...accountData,
         updatedAt: new Date()
-      })
-      await get().fetchAccounts()
+        })
+        await get().fetchAccounts()
     } catch (error) {
-      set({ error: (error as Error).message, isLoading: false })
+        set({ error: (error as Error).message, isLoading: false })
+        throw error
     }
   },
 
