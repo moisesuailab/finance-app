@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowUpRight,
   ArrowDownRight,
@@ -9,6 +10,7 @@ import {
   PiggyBank,
   Eye,
   EyeOff,
+  Repeat,
 } from "lucide-react";
 import { MobileLayout } from "@/components/layout/MobileLayout";
 import { Header } from "@/components/layout/Header";
@@ -31,6 +33,7 @@ import { TransferViewModal } from "@/components/modals/TransferViewModal";
 import { calculateRecurringProjections } from "@/lib/projections";
 
 export function Home() {
+  const navigate = useNavigate()
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set(['all']));
@@ -262,37 +265,45 @@ export function Home() {
       <Header
         title="Início"
         action={
-          <div className="flex gap-2">
+            <div className="flex gap-2">
             <button
-              onClick={toggleVisibility}
-              className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
-              title={isVisible ? "Ocultar valores" : "Mostrar valores"}
+                onClick={toggleVisibility}
+                className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
+                title={isVisible ? "Ocultar valores" : "Mostrar valores"}
             >
-              {isVisible ? (
+                {isVisible ? (
                 <Eye className="w-5 h-5 text-stone-600 dark:text-stone-400" />
-              ) : (
+                ) : (
                 <EyeOff className="w-5 h-5 text-stone-600 dark:text-stone-400" />
-              )}
+                )}
+            </button>
+            <button
+                onClick={() => navigate('/settings/recurrence')}
+                className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
+                title="Gerenciar fixas"
+            >
+                <Repeat className="w-5 h-5 text-stone-600 dark:text-stone-400" />
             </button>
             {isCurrentMonth && (
-              <button
+                <button
                 onClick={() => setShowTransfer(true)}
                 className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
-              >
+                title="Transferência"
+                >
                 <PiggyBank className="w-5 h-5 text-stone-600 dark:text-stone-400" />
-              </button>
+                </button>
             )}
             <Button
-              size="sm"
-              onClick={() => setShowForm(true)}
-              className="gap-2"
+                size="sm"
+                onClick={() => setShowForm(true)}
+                className="gap-2"
             >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Nova</span>
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Nova</span>
             </Button>
-          </div>
-        }
-      />
+            </div>
+          }
+        />
 
       <div className="p-4 sm:p-6 space-y-4">
         {/* Seletor de Mês */}

@@ -88,7 +88,10 @@ export function TransactionForm({
       setType(transaction.type);
       setStatus(transaction.status);
       setAmount(String(transaction.amount));
-      setDescription(transaction.description);
+      setDescription(transaction.isInstallment && transaction.baseDescription 
+        ? transaction.baseDescription 
+        : transaction.description
+      );
       setCategoryId(String(transaction.categoryId));
       setAccountId(String(transaction.accountId));
       setDate(formatDateForInput(new Date(transaction.date)));

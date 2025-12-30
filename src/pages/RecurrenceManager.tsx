@@ -1,13 +1,57 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { SubPageLayout } from '@/components/layout/SubPageLayout'
 import { Card, CardContent } from '@/components/ui/Card'
+import { TransactionForm } from '@/components/forms/TransactionForm'
+import { BlurValue } from '@/components/ui/BlurValue'
+import { Input } from '@/components/ui/Input'
+import { useVisibility } from '@/hooks/useVisibility'
 import { useTransactionStore } from '@/stores/useTransactionStore'
 import { useCategoryStore } from '@/stores/useCategoryStore'
 import { useAccountStore } from '@/stores/useAccountStore'
 import { formatCurrency } from '@/lib/formatters'
-import { Repeat, Calendar, TrendingUp, Clock } from 'lucide-react'
+import { Repeat, Calendar, TrendingUp, Clock, Search, Eye, EyeOff } from 'lucide-react'
 
 export function RecurrenceManager() {
+  const [showForm, setShowForm] = useState(false)
+  const [editingTransaction, setEditingTransaction] = useState<number | null>(null)
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set(['all']))
+
+  const { isVisible, toggleVisibility } = useVisibility()
+  const [searchTerm, setSearchTerm] = useState('')
+
+  const handleEditRecurrence = (transactionId: number) => {
+    setEditingTransaction(transactionId)
+    setShowForm(true)
+  }
+
+  const handleFilterToggle = (filter: string) => {
+    setActiveFilters(prev => {
+        const newFilters = new Set(prev)
+        
+        // Se clicar em "Todos"
+        if (filter === 'all') {
+        return new Set(['all'])
+        }
+        
+        // Remove "Todos" se clicar em qualquer outro
+        newFilters.delete('all')
+        
+        // Toggle do filtro clicado
+        if (newFilters.has(filter)) {
+        newFilters.delete(filter)
+        } else {
+        newFilters.add(filter)
+        }
+        
+        // Se nenhum filtro, volta para "Todos"
+        if (newFilters.size === 0) {
+        return new Set(['all'])
+        }
+        
+        return newFilters
+    })
+  }
+
   const transactions = useTransactionStore(state => state.transactions)
   const categories = useCategoryStore(state => state.categories)
   const accounts = useAccountStore(state => state.accounts)
@@ -20,13 +64,58 @@ export function RecurrenceManager() {
     )
   }, [transactions])
 
-  // Separar por tipo
-  const { determined, indeterminate } = useMemo(() => {
-    return {
-      determined: activeRecurrences.filter(t => t.recurrenceOccurrences !== undefined),
-      indeterminate: activeRecurrences.filter(t => t.recurrenceOccurrences === undefined)
+  // Aplicar filtros e separar por tipo
+  const { determined, indeterminate, allFiltered } = useMemo(() => {
+    let filtered = activeRecurrences
+
+    // Filtro de busca textual
+    if (searchTerm) {
+        filtered = filtered.filter(t => {
+        const desc = (t.baseDescription || t.description).toLowerCase()
+        return desc.includes(searchTerm.toLowerCase())
+        })
     }
-  }, [activeRecurrences])
+
+    // Aplicar filtros de tags
+    if (!activeFilters.has('all')) {
+        filtered = filtered.filter(t => {
+        // Filtro: Determinadas
+        if (activeFilters.has('determined') && t.recurrenceOccurrences !== undefined) return true
+        
+        // Filtro: Indeterminadas
+        if (activeFilters.has('indeterminate') && t.recurrenceOccurrences === undefined) return true
+        
+        // Filtro: Parcelamentos
+        if (activeFilters.has('installment') && t.isInstallment) return true
+        
+        // Filtro: Concluídas (todas parcelas geradas)
+        if (activeFilters.has('completed')) {
+            const generatedCount = t.isInstallment 
+            ? (t.generatedDates?.length || 0) + 1
+            : (t.generatedDates?.length || 0)
+            const totalOccurrences = t.recurrenceOccurrences || 0
+            return totalOccurrences > 0 && generatedCount >= totalOccurrences
+        }
+        
+        // Filtro: Ativas (ainda tem parcelas a gerar)
+        if (activeFilters.has('active')) {
+            if (!t.recurrenceOccurrences) return true // Indeterminadas são sempre ativas
+            const generatedCount = t.isInstallment 
+            ? (t.generatedDates?.length || 0) + 1
+            : (t.generatedDates?.length || 0)
+            return generatedCount < t.recurrenceOccurrences
+        }
+        
+        return false
+        })
+    }
+
+    return {
+        determined: filtered.filter(t => t.recurrenceOccurrences !== undefined),
+        indeterminate: filtered.filter(t => t.recurrenceOccurrences === undefined),
+        allFiltered: filtered
+    }
+  }, [activeRecurrences, activeFilters, searchTerm])
 
   const getCategoryName = (categoryId: number) => {
     return categories.find(c => c.id === categoryId)?.name || 'Sem categoria'
@@ -47,13 +136,19 @@ export function RecurrenceManager() {
   }
 
   const renderRecurrenceCard = (transaction: typeof transactions[0]) => {
-    const generatedCount = transaction.generatedDates?.length || 0
+    const generatedCount = transaction.isInstallment 
+        ? (transaction.generatedDates?.length || 0) + 1
+        : (transaction.generatedDates?.length || 0)
     const totalOccurrences = transaction.recurrenceOccurrences || 0
     const progress = totalOccurrences > 0 ? (generatedCount / totalOccurrences) * 100 : 0
 
     return (
-      <Card key={transaction.id}>
-        <CardContent className="p-4">
+        <Card 
+            key={transaction.id}
+            onClick={() => handleEditRecurrence(transaction.id!)}
+            className="cursor-pointer active:scale-[0.98] transition-transform hover:shadow-md"
+        >
+            <CardContent className="p-4">
           <div className="flex items-start gap-3">
             <div className={`p-2.5 rounded-xl flex-shrink-0 ${
               transaction.type === 'income'
@@ -107,14 +202,16 @@ export function RecurrenceManager() {
             </div>
 
             <div className="text-right flex-shrink-0">
-              <p className={`text-lg font-bold ${
-                transaction.type === 'income'
-                  ? 'text-green-600 dark:text-green-500'
-                  : 'text-red-600 dark:text-red-500'
-              }`}>
-                {transaction.type === 'income' ? '+' : ''}
-                {formatCurrency(transaction.amount)}
-              </p>
+                <BlurValue isVisible={isVisible}>
+                    <p className={`text-lg font-bold ${
+                    transaction.type === 'income'
+                        ? 'text-green-600 dark:text-green-500'
+                        : 'text-red-600 dark:text-red-500'
+                    }`}>
+                    {transaction.type === 'income' ? '+' : ''}
+                    {formatCurrency(transaction.amount)}
+                    </p>
+                </BlurValue>
             </div>
           </div>
         </CardContent>
@@ -123,7 +220,22 @@ export function RecurrenceManager() {
   }
 
   return (
-    <SubPageLayout title="Recorrências">
+  <SubPageLayout 
+    title="Recorrências"
+    action={
+      <button
+        onClick={toggleVisibility}
+        className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors"
+        title={isVisible ? "Ocultar valores" : "Mostrar valores"}
+      >
+        {isVisible ? (
+          <Eye className="w-5 h-5 text-stone-600 dark:text-stone-400" />
+        ) : (
+          <EyeOff className="w-5 h-5 text-stone-600 dark:text-stone-400" />
+        )}
+      </button>
+    }
+  >
       <div className="p-4 sm:p-6 space-y-6">
         {/* Resumo */}
         <div className="grid grid-cols-2 gap-4">
@@ -158,6 +270,98 @@ export function RecurrenceManager() {
           </Card>
         </div>
 
+        {/* Busca */}
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
+          <Input
+            placeholder="Buscar por descrição..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-12"
+          />
+        </div>
+
+        {/* Filtros por Tags */}
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          <button
+            onClick={() => handleFilterToggle('all')}
+            className={`
+              px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
+              ${activeFilters.has('all')
+                ? 'bg-stone-900 dark:bg-stone-50 text-white dark:text-stone-900 border-2 border-stone-900 dark:border-stone-50'
+                : 'bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-2 border-transparent hover:bg-stone-300 dark:hover:bg-stone-700'
+              }
+            `}
+          >
+            Todas
+          </button>
+          
+          <button
+            onClick={() => handleFilterToggle('active')}
+            className={`
+              px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
+              ${activeFilters.has('active')
+                ? 'bg-stone-900 dark:bg-stone-50 text-white dark:text-stone-900 border-2 border-stone-900 dark:border-stone-50'
+                : 'bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-2 border-transparent hover:bg-stone-300 dark:hover:bg-stone-700'
+              }
+            `}
+          >
+            Ativas
+          </button>
+          
+          <button
+            onClick={() => handleFilterToggle('completed')}
+            className={`
+              px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
+              ${activeFilters.has('completed')
+                ? 'bg-stone-900 dark:bg-stone-50 text-white dark:text-stone-900 border-2 border-stone-900 dark:border-stone-50'
+                : 'bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-2 border-transparent hover:bg-stone-300 dark:hover:bg-stone-700'
+              }
+            `}
+          >
+            Concluídas
+          </button>
+          
+          <button
+            onClick={() => handleFilterToggle('installment')}
+            className={`
+              px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
+              ${activeFilters.has('installment')
+                ? 'bg-stone-900 dark:bg-stone-50 text-white dark:text-stone-900 border-2 border-stone-900 dark:border-stone-50'
+                : 'bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-2 border-transparent hover:bg-stone-300 dark:hover:bg-stone-700'
+              }
+            `}
+          >
+            Parcelamentos
+          </button>
+          
+          <button
+            onClick={() => handleFilterToggle('determined')}
+            className={`
+              px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
+              ${activeFilters.has('determined')
+                ? 'bg-stone-900 dark:bg-stone-50 text-white dark:text-stone-900 border-2 border-stone-900 dark:border-stone-50'
+                : 'bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-2 border-transparent hover:bg-stone-300 dark:hover:bg-stone-700'
+              }
+            `}
+          >
+            Determinadas
+          </button>
+          
+          <button
+            onClick={() => handleFilterToggle('indeterminate')}
+            className={`
+              px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
+              ${activeFilters.has('indeterminate')
+                ? 'bg-stone-900 dark:bg-stone-50 text-white dark:text-stone-900 border-2 border-stone-900 dark:border-stone-50'
+                : 'bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-2 border-transparent hover:bg-stone-300 dark:hover:bg-stone-700'
+              }
+            `}
+          >
+            Indeterminadas
+          </button>
+        </div>
+
         {/* Determinadas */}
         {determined.length > 0 && (
           <div className="space-y-3">
@@ -183,7 +387,7 @@ export function RecurrenceManager() {
         )}
 
         {/* Empty state */}
-        {activeRecurrences.length === 0 && (
+        {allFiltered.length === 0 && (
           <Card>
             <CardContent className="p-12 text-center">
               <Repeat className="w-12 h-12 text-stone-400 mx-auto mb-4" />
@@ -195,6 +399,17 @@ export function RecurrenceManager() {
           </Card>
         )}
       </div>
+
+      {showForm && (
+        <TransactionForm
+          isOpen={showForm}
+          onClose={() => {
+            setShowForm(false)
+            setEditingTransaction(null)
+          }}
+          transactionId={editingTransaction}
+        />
+      )}
     </SubPageLayout>
   )
 }
