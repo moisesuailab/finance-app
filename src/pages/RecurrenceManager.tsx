@@ -136,9 +136,9 @@ export function RecurrenceManager() {
   }
 
   const renderRecurrenceCard = (transaction: typeof transactions[0]) => {
-    const generatedCount = transaction.isInstallment 
-        ? (transaction.generatedDates?.length || 0) + 1
-        : (transaction.generatedDates?.length || 0)
+    const generatedCount = transaction.recurrenceOccurrences !== undefined
+      ? (transaction.generatedDates?.length || 0) + 1
+      : (transaction.generatedDates?.length || 0)
     const totalOccurrences = transaction.recurrenceOccurrences || 0
     const progress = totalOccurrences > 0 ? (generatedCount / totalOccurrences) * 100 : 0
 
@@ -183,22 +183,30 @@ export function RecurrenceManager() {
               </p>
 
               {/* Progresso */}
-              {transaction.recurrenceOccurrences && (
+              {transaction.recurrenceOccurrences !== undefined ? (
+                // Determinadas: mostra progresso com barra
                 <div className="mt-3">
-                  <div className="flex items-center justify-between text-xs text-stone-500 mb-1">
+                    <div className="flex items-center justify-between text-xs text-stone-500 mb-1">
                     <span>{generatedCount} de {totalOccurrences} geradas</span>
                     <span>{progress.toFixed(0)}%</span>
-                  </div>
-                  <div className="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-2">
+                    </div>
+                    <div className="w-full bg-stone-200 dark:bg-stone-800 rounded-full h-2">
                     <div
-                      className={`h-2 rounded-full transition-all ${
+                        className={`h-2 rounded-full transition-all ${
                         transaction.type === 'income' ? 'bg-green-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${progress}%` }}
+                        }`}
+                        style={{ width: `${progress}%` }}
                     />
-                  </div>
+                    </div>
                 </div>
-              )}
+                ) : generatedCount > 0 ? (
+                // Indeterminadas: mostra apenas quantidade (sem barra)
+                <div className="mt-2">
+                    <p className="text-xs text-stone-500">
+                    {generatedCount} {generatedCount === 1 ? 'gerada' : 'geradas'}
+                    </p>
+                </div>
+              ) : null}
             </div>
 
             <div className="text-right flex-shrink-0">
