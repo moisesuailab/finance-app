@@ -8,9 +8,11 @@ import { Reports } from '@/pages/Reports'
 import { Settings } from '@/pages/Settings'
 import { RecurrenceManager } from '@/pages/RecurrenceManager'
 import { Welcome } from '@/pages/Welcome'
+import { PinLogin } from '@/components/auth/PinLogin'
 import { useAccountStore } from '@/stores/useAccountStore'
 import { useCategoryStore } from '@/stores/useCategoryStore'
 import { useTransactionStore } from '@/stores/useTransactionStore'
+import { useSecurityStore } from '@/stores/useSecurityStore'
 import { useInitialSetup } from '@/hooks/useInitialSetup'
 import { useRecurringTransactions } from '@/hooks/useRecurringTransactions'
 
@@ -37,7 +39,29 @@ function AppContent() {
   const fetchCategories = useCategoryStore(state => state.fetchCategories)
   const fetchTransactions = useTransactionStore(state => state.fetchTransactions)
 
+  const { isAuthenticated, checkSession, settings, fetchSettings } = useSecurityStore()
+
   useRecurringTransactions()
+
+  // Carregar configurações de segurança APENAS UMA VEZ
+  useEffect(() => {
+    fetchSettings()
+  }, [fetchSettings])
+
+  // Verificar sessão ao voltar para a aba (Page Visibility API)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkSession()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [checkSession])
 
   useEffect(() => {
     if (isInitialized) {
@@ -62,6 +86,12 @@ function AppContent() {
     navigate(routes[tab])
   }
 
+  // Se não está autenticado E auth está habilitado, mostrar login
+  if (!isAuthenticated && settings?.authEnabled) {
+    return <PinLogin />
+  }
+
+  // Se não está inicializado, mostrar loading
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -75,15 +105,15 @@ function AppContent() {
 
   return (
     <>
-        <Routes>
+      <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/accounts" element={<Accounts />} />
         <Route path="/categories" element={<Categories />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/recurrence" element={<RecurrenceManager />} />
-        </Routes>
-        {isMainRoute && <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />}
+      </Routes>
+      {isMainRoute && <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />}
     </>
   )
 }
@@ -98,6 +128,7 @@ function App() {
     setShowWelcome(false)
   }
 
+  // Mostrar welcome ANTES de qualquer coisa
   if (showWelcome) {
     return <Welcome onComplete={handleWelcomeComplete} />
   }

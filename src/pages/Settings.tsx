@@ -7,11 +7,15 @@ import {
   Upload,
   Database,
   Wallet,
+  Shield,
+  Lock,
 } from "lucide-react";
 import { MobileLayout } from "@/components/layout/MobileLayout";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Dialog } from "@/components/ui/Dialog";
+import { SecurityModal } from '@/components/modals/SecurityModal'
+import { useSecurityStore } from '@/stores/useSecurityStore'
 import { db } from "@/lib/db";
 import { toast } from "react-toastify";
 
@@ -20,10 +24,32 @@ export function Settings() {
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [showSecurityModal, setShowSecurityModal] = useState(false)
+  const [securityModalMode, setSecurityModalMode] = useState<'enable' | 'change'>('enable')
+
+  const { settings, disableAuth, fetchSettings } = useSecurityStore()
+
+  useEffect(() => {
+    fetchSettings()
+  }, [fetchSettings])
+
   useEffect(() => {
     const isDark = document.documentElement.classList.contains("dark");
     setDarkMode(isDark);
   }, []);
+
+  const handleDisableAuth = async () => {
+    setIsLoading(true)
+    try {
+        await disableAuth()
+        toast.success('Autenticação desabilitada')
+    } catch (error) {
+        console.error('Erro ao desabilitar:', error)
+        toast.error('Erro ao desabilitar autenticação')
+    } finally {
+        setIsLoading(false)
+    }
+  }
 
   const toggleDarkMode = () => {
     const html = document.documentElement;
@@ -203,6 +229,83 @@ export function Settings() {
           </Card>
         </div>
 
+        {/* Segurança */}
+        <div>
+          <h2 className="text-sm font-semibold text-stone-500 dark:text-stone-400 mb-3 px-2">
+            SEGURANÇA
+          </h2>
+          <div className="space-y-2">
+            {/* Status da Autenticação */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Shield className="w-5 h-5 text-stone-700 dark:text-stone-300" />
+                    <div>
+                      <p className="font-medium text-stone-900 dark:text-stone-50">
+                        Autenticação por PIN
+                      </p>
+                      <p className="text-sm text-stone-500">
+                        {settings?.authEnabled 
+                          ? 'Habilitada' 
+                          : 'Desabilitada'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (settings?.authEnabled) {
+                        handleDisableAuth()
+                      } else {
+                        setSecurityModalMode('enable')
+                        setShowSecurityModal(true)
+                      }
+                    }}
+                    className={`relative w-14 h-8 rounded-full transition-colors ${
+                      settings?.authEnabled 
+                        ? 'bg-blue-600' 
+                        : 'bg-stone-300 dark:bg-stone-700'
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-transform ${
+                        settings?.authEnabled 
+                          ? 'translate-x-7' 
+                          : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Alterar PIN (apenas se habilitado) */}
+            {settings?.authEnabled && (
+              <Card>
+                <CardContent className="p-4">
+                  <button
+                    onClick={() => {
+                      setSecurityModalMode('change')
+                      setShowSecurityModal(true)
+                    }}
+                    className="w-full flex items-center gap-3 text-left"
+                  >
+                    <Lock className="w-5 h-5 text-stone-700 dark:text-stone-300" />
+                    <div>
+                      <p className="font-medium text-stone-900 dark:text-stone-50">
+                        Alterar PIN
+                      </p>
+                      <p className="text-sm text-stone-500">
+                        Trocar o código de acesso
+                      </p>
+                    </div>
+                  </button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+
         {/* Dados */}
         <div>
           <h2 className="text-sm font-semibold text-stone-500 dark:text-stone-400 mb-3 px-2">
@@ -341,6 +444,13 @@ export function Settings() {
           orçamentos serão perdidos permanentemente.
         </p>
       </Dialog>
+
+      {/* Modal de Segurança */}
+      <SecurityModal
+        isOpen={showSecurityModal}
+        onClose={() => setShowSecurityModal(false)}
+        mode={securityModalMode}
+      />
     </MobileLayout>
   );
 }

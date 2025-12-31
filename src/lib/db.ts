@@ -2,11 +2,23 @@ import Dexie, { type EntityTable } from 'dexie'
 import type { Account, Budget, Category, Transaction } from '@/types/finance'
 import { differenceInDays, differenceInWeeks, differenceInMonths, differenceInYears } from 'date-fns'
 
+interface SecuritySettings {
+  id?: number
+  authEnabled: boolean
+  authMethod: 'pin' | 'biometric' | 'both'
+  pinHash?: string
+  sessionTimeout: number
+  lastActivity?: Date
+  createdAt: Date
+  updatedAt: Date
+}
+
 class FinanceDatabase extends Dexie {
   accounts!: EntityTable<Account, 'id'>
   categories!: EntityTable<Category, 'id'>
   transactions!: EntityTable<Transaction, 'id'>
   budgets!: EntityTable<Budget, 'id'>
+  security!: EntityTable<SecuritySettings, 'id'>
 
   constructor() {
     super('FinanceDB')
@@ -115,6 +127,12 @@ class FinanceDatabase extends Dexie {
           account.description = undefined
         }
       })
+    })
+
+    this.version(8).stores({
+      accounts: '++id, name, currentBalance, isArchived, excludeFromTotal, createdAt',
+      transactions: '++id, accountId, categoryId, type, status, date, fromAccountId, toAccountId, createdAt',
+      security: '++id, authEnabled, createdAt'
     })
   }
 }
