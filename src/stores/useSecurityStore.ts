@@ -172,31 +172,35 @@ export const useSecurityStore = create<SecurityStore>((set, get) => ({
   },
 
   checkSession: () => {
-    const { settings, isAuthenticated } = get();
-
+    const { settings } = get()
+    
     // Se não tem auth habilitado, sempre autenticado
-    if (!settings?.authEnabled) return true;
-
-    // Se não está autenticado, retorna false
-    if (!isAuthenticated) return false;
-
-    // Se timeout é 0 (nunca), sessão nunca expira
-    if (settings.sessionTimeout === 0) return true;
-
-    // Verificar se sessão expirou
-    if (settings.lastActivity) {
-      const now = new Date();
-      const lastActivity = new Date(settings.lastActivity);
-      const diffMinutes =
-        (now.getTime() - lastActivity.getTime()) / (1000 * 60);
-
+    if (!settings?.authEnabled) return true
+    
+    // Verificar se tem sessão no sessionStorage
+    const hasActiveSession = sessionStorage.getItem(SESSION_KEY) === 'true'
+    
+    if (!hasActiveSession) {
+      set({ isAuthenticated: false })
+      return false
+    }
+    
+    // Se tem sessão E timeout NÃO é 0, verificar expiração por tempo
+    if (settings.sessionTimeout !== 0 && settings.lastActivity) {
+      const now = new Date()
+      const lastActivity = new Date(settings.lastActivity)
+      const diffMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60)
+      
       if (diffMinutes > settings.sessionTimeout) {
-        set({ isAuthenticated: false });
-        return false;
+        sessionStorage.removeItem(SESSION_KEY)
+        set({ isAuthenticated: false })
+        return false
       }
     }
-
-    return true;
+    
+    // Sessão válida
+    set({ isAuthenticated: true })
+    return true
   },
 
   updateActivity: () => {
