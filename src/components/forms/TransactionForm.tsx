@@ -289,7 +289,7 @@ export function TransactionForm({
                 isEditing && "opacity-50 cursor-not-allowed"
               )}
             >
-              Receita
+              Entrada
             </button>
             <button
               type="button"
@@ -303,7 +303,7 @@ export function TransactionForm({
                 isEditing && "opacity-50 cursor-not-allowed"
               )}
             >
-              Despesa
+              Saída
             </button>
           </div>
         </div>
@@ -536,3 +536,4 @@ export function TransactionForm({
     </Dialog>
   );
 }
+
