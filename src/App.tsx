@@ -16,6 +16,8 @@ import { useSecurityStore } from '@/stores/useSecurityStore'
 import { useInitialSetup } from '@/hooks/useInitialSetup'
 import { useRecurringTransactions } from '@/hooks/useRecurringTransactions'
 
+const SESSION_KEY = 'financeAppSession'
+
 function AppContent() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -48,11 +50,21 @@ function AppContent() {
     fetchSettings()
   }, [fetchSettings])
 
-  // Verificar sessão ao voltar para a aba (Page Visibility API)
+  // Logout IMEDIATO ao minimizar
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        checkSession()
+      if (!settings?.authEnabled) return
+
+      if (document.visibilityState === 'hidden') {
+        // App foi para background → Logout IMEDIATO
+        sessionStorage.removeItem(SESSION_KEY)
+      } else if (document.visibilityState === 'visible') {
+        // App voltou → Verificar se tem sessão ativa
+        const hasSession = sessionStorage.getItem(SESSION_KEY) === 'true'
+        if (!hasSession && settings?.authEnabled) {
+          // Forçar logout no estado
+          checkSession()
+        }
       }
     }
 
@@ -61,7 +73,7 @@ function AppContent() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [checkSession])
+  }, [checkSession, settings])
 
   useEffect(() => {
     if (isInitialized) {
