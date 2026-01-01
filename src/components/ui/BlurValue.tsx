@@ -9,14 +9,15 @@ interface BlurValueProps {
 
 export function BlurValue({ children, isVisible, className }: BlurValueProps) {
   return (
-    <span
+    <div
       className={cn(
         'transition-all duration-200',
-        !isVisible && 'blur-md select-none',
+        !isVisible && 'filter blur-md select-none',
         className
       )}
+      aria-hidden={!isVisible}
     >
       {children}
-    </span>
+    </div>
   )
 }
