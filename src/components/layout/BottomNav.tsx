@@ -21,36 +21,29 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-stone-900 border-t border-stone-200 dark:border-stone-800 pb-safe">
       <div className="flex items-center justify-around h-16 sm:h-20 max-w-screen-lg mx-auto px-2">
         {tabs.map((tab) => {
-          const Icon = tab.icon
           const isActive = activeTab === tab.id
-
+          
           return (
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl transition-all min-w-[60px]',
-                'active:scale-95',
-                isActive
-                  ? 'text-stone-900 dark:text-stone-50'
-                  : 'text-stone-400 dark:text-stone-600'
+                "flex flex-col items-center justify-center w-12 transition-all duration-300",
+                isActive ? "" : "gap-1 text-stone-400 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
               )}
             >
-              <Icon
-                className={cn(
-                  'transition-all',
-                  isActive ? 'w-6 h-6' : 'w-5 h-5'
-                )}
-                strokeWidth={isActive ? 2.5 : 2}
-              />
-              <span
-                className={cn(
-                  'text-[10px] font-medium transition-all',
-                  isActive ? 'opacity-100' : 'opacity-70'
-                )}
-              >
-                {tab.label}
-              </span>
+              {isActive ? (
+                <div className="bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 w-12 h-12 rounded-full flex items-center justify-center shadow-lg shadow-stone-200 dark:shadow-none animate-in fade-in zoom-in duration-200">
+                  <tab.icon className="w-5 h-5" />
+                </div>
+              ) : (
+                <>
+                  <tab.icon className="w-6 h-6" />
+                  <span className="text-[10px] font-medium">
+                    {tab.label}
+                  </span>
+                </>
+              )}
             </button>
           )
         })}
